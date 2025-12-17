@@ -1,0 +1,1 @@
+/Users/prasanna/code/naadshala/AGENTS.md
