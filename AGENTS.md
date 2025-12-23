@@ -19,11 +19,14 @@ python generate_tanpura_files.py
 
 # Generate pluck files (180 OGG files → output/plucks/)
 python generate_reference_plucks.py
+
+# Generate swarmandal files (180 OGG files → output/swarmandal/)
+python generate_swarmandal_plucks.py
 ```
 
 ## Architecture
 
-**Two independent audio generators:**
+**Three independent audio generators:**
 
 1. **generate_tanpura_files.py** - Additive synthesis for tanpura drones
    - Creates 45 files: 15 Sa frequencies × 3 String 1 options (P, m, N)
@@ -34,6 +37,11 @@ python generate_reference_plucks.py
    - Creates 180 files: 15 Sa frequencies × 12 swars
    - Mono output, ~1 second per file
 
+3. **generate_swarmandal_plucks.py** - Karplus-Strong algorithm for swarmandal-like plucks
+   - Creates 180 files: 15 Sa frequencies × 12 swars
+   - Brighter (0.95) and longer sustain (0.997) than guitar plucks
+   - Mono output, ~3 seconds per file with 500ms fade out
+
 **Audio conventions:**
 - Sample rate: 44.1 kHz
 - Format: OGG Vorbis
@@ -42,7 +50,7 @@ python generate_reference_plucks.py
 
 **Filename patterns:**
 - Tanpura: `{sa}_{string1}.ogg` (e.g., `c3_P.ogg`)
-- Plucks: `{sa}_{swar_number}_{swar}.ogg` (e.g., `c3_1_S.ogg`)
+- Plucks/Swarmandal: `{sa}_{swar_number}_{swar}.ogg` (e.g., `c3_1_S.ogg`)
 
 ## Domain Knowledge
 
