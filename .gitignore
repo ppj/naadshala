@@ -19,3 +19,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# AI assistant
+.claude/settings.local.json
