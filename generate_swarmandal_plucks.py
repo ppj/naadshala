@@ -97,11 +97,11 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Generating swarmandal files in: {output_dir}")
-    print(f"Total files: {len(SA_FREQUENCIES)} Sa x {len(SWARS)} swars = {len(SA_FREQUENCIES) * len(SWARS)}")
+    print(f"Total files: {len(SA_FREQUENCIES)} Sa x {len(SWARS)} swars + {len(SA_FREQUENCIES)} ati-taar Sa = {len(SA_FREQUENCIES) * len(SWARS) + len(SA_FREQUENCIES)}")
     print()
 
     file_count = 0
-    total_files = len(SA_FREQUENCIES) * len(SWARS)
+    total_files = len(SA_FREQUENCIES) * len(SWARS) + len(SA_FREQUENCIES)
 
     for sa_name, sa_freq in SA_FREQUENCIES.items():
         for swar_index, (swar_name, swar_ratio) in enumerate(SWARS, start=1):
@@ -114,6 +114,18 @@ def main():
 
             audio_data = karplus_strong_pluck(frequency, PLUCK_DURATION)
             sf.write(filepath, audio_data, SAMPLE_RATE, format="OGG", subtype="VORBIS")
+
+    # Generate ati-taar Sa (two octaves above)
+    for sa_name, sa_freq in SA_FREQUENCIES.items():
+        file_count += 1
+        frequency = sa_freq * 4.0  # Two octaves up
+        filename = f"{sa_name}_S2.ogg"
+        filepath = output_dir / filename
+
+        print(f"[{file_count}/{total_files}] {filename} ({frequency:.2f} Hz)")
+
+        audio_data = karplus_strong_pluck(frequency, PLUCK_DURATION)
+        sf.write(filepath, audio_data, SAMPLE_RATE, format="OGG", subtype="VORBIS")
 
     print(f"\nDone! {total_files} files in {output_dir}")
 

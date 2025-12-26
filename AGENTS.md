@@ -20,7 +20,7 @@ python generate_tanpura_files.py
 # Generate pluck files (180 OGG files → output/plucks/)
 python generate_reference_plucks.py
 
-# Generate swarmandal files (180 OGG files → output/swarmandal/)
+# Generate swarmandal files (195 OGG files → output/swarmandal/)
 python generate_swarmandal_plucks.py
 ```
 
@@ -38,7 +38,7 @@ python generate_swarmandal_plucks.py
    - Mono output, ~1 second per file
 
 3. **generate_swarmandal_plucks.py** - Karplus-Strong algorithm for swarmandal-like plucks
-   - Creates 180 files: 15 Sa frequencies × 12 swars
+   - Creates 195 files: 15 Sa frequencies × (12 swars + ati-taar Sa)
    - Brighter (0.95) and longer sustain (0.997) than guitar plucks
    - Mono output, ~3 seconds per file with 500ms fade out
 
@@ -51,6 +51,7 @@ python generate_swarmandal_plucks.py
 **Filename patterns:**
 - Tanpura: `{sa}_{string1}.ogg` (e.g., `c3_P.ogg`)
 - Plucks/Swarmandal: `{sa}_{swar_number}_{swar}.ogg` (e.g., `c3_1_S.ogg`)
+- Swarmandal ati-taar Sa: `{sa}_S2.ogg` (e.g., `c3_S2.ogg`)
 
 ## Domain Knowledge
 
