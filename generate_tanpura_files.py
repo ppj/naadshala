@@ -261,23 +261,25 @@ def main():
                      format="OGG", subtype="VORBIS")
             print(f"  ✓ OGG written")
 
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                tmp_path = Path(tmp.name)
-            sf.write(tmp_path, audio_data, SAMPLE_RATE, format="WAV", subtype="PCM_16")
-            subprocess.run(
-                [
-                    "afconvert",
-                    str(tmp_path),
-                    str(caf_dir / f"{stem}.caf"),
-                    "-f", "caff",   # CAF container
-                    "-d", "aac",    # AAC codec
-                    "-b", "128000", # 128 kbps
-                ],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            tmp_path.unlink()
+            _, tmp_name = tempfile.mkstemp(suffix=".wav")
+            tmp_path = Path(tmp_name)
+            try:
+                sf.write(tmp_path, audio_data, SAMPLE_RATE, format="WAV", subtype="PCM_16")
+                subprocess.run(
+                    [
+                        "afconvert",
+                        str(tmp_path),
+                        str(caf_dir / f"{stem}.caf"),
+                        "-f", "caff",   # CAF container
+                        "-d", "aac",    # AAC codec
+                        "-b", "128000", # 128 kbps
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            finally:
+                tmp_path.unlink(missing_ok=True)
             print(f"  ✓ CAF written\n")
 
     print(f"\n{'=' * 60}")
