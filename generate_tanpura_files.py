@@ -229,8 +229,6 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
     return stereo_buffer
 
 
-
-
 def main():
     """Generate all tanpura audio files (OGG for Android, CAF for iOS)."""
     ogg_dir = Path(__file__).parent / "output" / "tanpura"
@@ -262,8 +260,6 @@ def main():
                      format="OGG", subtype="VORBIS")
             print(f"  ✓ OGG written")
 
-            # CAF/AAC via afconvert (macOS built-in tool).
-            # Write a temp WAV, convert to CAF+AAC, then delete the temp file.
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                 tmp_path = Path(tmp.name)
             sf.write(tmp_path, audio_data, SAMPLE_RATE, format="WAV", subtype="PCM_16")
