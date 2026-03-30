@@ -118,12 +118,13 @@ def generate_string_pluck(
     """
     Generate a single string pluck with realistic tanpura timbre using additive synthesis.
 
-    v1n improvements over original:
-    - Multiplicative envelope (no amplitude discontinuity at attack/decay join)
-    - Slower decay (0.112) for longer sustain and better string overlap
-    - No sinusoidal AM (was causing flangy/tremolo artefacts)
-    - Slightly higher inharmonicity (0.0004) for organic inter-harmonic beating
-    - Tighter harmonic decay coefficient (0.003 vs 0.004)
+    Envelope is multiplicative (sigmoid attack × exponential decay) so there is no
+    amplitude discontinuity at the attack/decay join. Decay is intentionally slow
+    (0.112) to allow string overlaps in the full cycle.
+
+    Sinusoidal AM is omitted deliberately — per-harmonic amplitude modulation produced
+    flangy/tremolo artefacts rather than authentic jawari. The jawari waxing/waning
+    effect instead emerges from inter-harmonic beating driven by the inharmonicity term.
     """
     num_samples = int(SAMPLE_RATE * duration)
     t = np.arange(num_samples) / SAMPLE_RATE
