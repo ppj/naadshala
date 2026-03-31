@@ -14,7 +14,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Generate tanpura files (45 OGG files → output/tanpura/)
+# Generate tanpura files (45 OGG → output/tanpura/, 45 CAF → output/tanpura_caf/)
 python generate_tanpura_files.py
 
 # Generate pluck files (180 OGG files → output/plucks/)
@@ -29,7 +29,9 @@ python generate_swarmandal_plucks.py
 **Three independent audio generators:**
 
 1. **generate_tanpura_files.py** - Additive synthesis for tanpura drones
-   - Creates 45 files: 15 Sa frequencies × 3 String 1 options (P, m, N)
+   - Creates 45 files per format: 15 Sa frequencies × 3 String 1 options (P, m, N)
+   - Dual output: OGG Vorbis → `output/tanpura/` (Android); CAF/AAC → `output/tanpura_caf/` (iOS)
+   - CAF conversion uses macOS `afconvert` (pre-installed on Mac, not available on Linux)
    - Uses harmonic structure extracted from real Calcutta-standard tanpura
    - Stereo output with Haas effect, ~10 seconds per file
 
