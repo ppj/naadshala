@@ -134,7 +134,7 @@ def generate_string_pluck(
     decay = np.exp(-(t - attack_duration).clip(min=0) * 0.112)
     envelope = attack * decay
 
-    inharmonicity_coeff = 0.0004
+    inharmonicity_coeff = 0.0001
 
     samples = np.zeros(num_samples)
     for harmonic_num, amplitude in HARMONICS:
