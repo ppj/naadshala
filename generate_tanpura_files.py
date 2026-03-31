@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Generate pre-recorded OGG Vorbis files for tanpura playback.
+Generate pre-recorded audio files for tanpura playback.
 Creates 45 files: 3 String 1 notes (P, m, N) × 15 Sa values (G#2 to A#3)
+
+Outputs two formats:
+  - OGG Vorbis → output/tanpura/          (Android / Swaramandal)
+  - CAF/AAC    → output/tanpura_caf/       (iOS / iSwarmandal)
+    Requires macOS afconvert (pre-installed on all Macs, not available on Linux).
 
 Harmonic structure extracted from real Calcutta-standard male tanpura recording
 via spectral analysis (FFT). Key finding: H7 is the dominant harmonic (1.00),
@@ -29,6 +34,8 @@ Alternative (future consideration):
 - Consider if synthesis params change frequently or repo size becomes problematic
 """
 
+import subprocess
+import tempfile
 import numpy as np
 from pathlib import Path
 import soundfile as sf
@@ -110,22 +117,26 @@ def generate_string_pluck(
 ):
     """
     Generate a single string pluck with realistic tanpura timbre using additive synthesis.
+
+    Envelope is multiplicative (sigmoid attack × exponential decay) so there is no
+    amplitude discontinuity at the attack/decay join. Decay is intentionally slow
+    (0.112) to allow string overlaps in the full cycle.
+
+    Sinusoidal AM is omitted deliberately — per-harmonic amplitude modulation produced
+    flangy/tremolo artefacts rather than authentic jawari. The jawari waxing/waning
+    effect instead emerges from inter-harmonic beating driven by the inharmonicity term.
     """
     num_samples = int(SAMPLE_RATE * duration)
-    samples = np.zeros(num_samples)
-
-    # Time array
     t = np.arange(num_samples) / SAMPLE_RATE
 
-    # Envelope: sigmoid attack then exponential decay
-    envelope = np.where(
-        t < attack_duration,
-        1.0 / (1.0 + np.exp(-12.0 * (t / attack_duration - 0.5))),
-        np.exp(-t * 0.15),
-    )
+    # Envelope: multiplicative sigmoid attack × exponential decay (no discontinuity)
+    attack = 1.0 / (1.0 + np.exp(-10.0 * (t / attack_duration - 0.5)))
+    decay = np.exp(-(t - attack_duration).clip(min=0) * 0.112)
+    envelope = attack * decay
 
-    inharmonicity_coeff = 0.0002
+    inharmonicity_coeff = 0.0001
 
+    samples = np.zeros(num_samples)
     for harmonic_num, amplitude in HARMONICS:
         # Inharmonicity: harmonics are slightly sharp
         inharmonic_factor = np.sqrt(
@@ -135,25 +146,12 @@ def generate_string_pluck(
         phase = 2.0 * np.pi * harmonic_freq * t
 
         # Frequency-dependent damping
-        harmonic_decay = np.exp(-t * (0.15 + harmonic_num * harmonic_num * 0.004))
-
-        # Per-harmonic amplitude modulation (jawari waxing/waning effect)
-        modulation_freq = 1.5 + (harmonic_num * 0.15)
-        modulation_phase = harmonic_num * 0.4
-        modulation_depth = 0.32 * np.exp(-t * 0.8)
-        harmonic_modulation = 1.0 + modulation_depth * np.sin(
-            2.0 * np.pi * modulation_freq * t + modulation_phase
-        )
+        harmonic_decay = np.exp(-t * (0.112 + harmonic_num * harmonic_num * 0.003))
 
         # Phase variation
         harmonic_phase_shift = np.sin(harmonic_num * 0.7) * 0.05
 
-        samples += (
-            amplitude
-            * harmonic_decay
-            * harmonic_modulation
-            * np.sin(phase + harmonic_phase_shift)
-        )
+        samples += amplitude * harmonic_decay * np.sin(phase + harmonic_phase_shift)
 
     # Apply envelope, amplitude variation, and volume
     amplitude_sum = sum(amp for _, amp in HARMONICS)
@@ -177,22 +175,22 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
     # Generate individual strings with different attack durations
     print(f"  Generating String 1 ({string1_note})...")
     string1_samples = generate_string_pluck(
-        string1_freq, SUSTAIN_DURATION, amplitude_variation=0.98, attack_duration=0.4
+        string1_freq, SUSTAIN_DURATION, amplitude_variation=0.98, attack_duration=0.63
     )
 
     print(f"  Generating String 2 (Sa)...")
     string2_samples = generate_string_pluck(
-        string2_freq, SUSTAIN_DURATION, amplitude_variation=1.0, attack_duration=0.8
+        string2_freq, SUSTAIN_DURATION, amplitude_variation=1.0, attack_duration=0.90
     )
 
     print(f"  Generating String 3 (Sa)...")
     string3_samples = generate_string_pluck(
-        string3_freq, SUSTAIN_DURATION, amplitude_variation=1.0, attack_duration=0.8
+        string3_freq, SUSTAIN_DURATION, amplitude_variation=1.0, attack_duration=0.90
     )
 
     print(f"  Generating String 4 (lower Sa)...")
     string4_samples = generate_string_pluck(
-        string4_freq, SUSTAIN_DURATION, amplitude_variation=0.96, attack_duration=0.6
+        string4_freq, SUSTAIN_DURATION, amplitude_variation=0.96, attack_duration=0.63
     )
 
     # Mix strings with traditional plucking pattern (beats: 1, -, 3, 4, 5, -)
@@ -233,42 +231,59 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
 
 
 def main():
-    """Generate all tanpura OGG files."""
-    # Create output directory
-    output_dir = Path(__file__).parent / "output" / "tanpura"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    """Generate all tanpura audio files (OGG for Android, CAF for iOS)."""
+    ogg_dir = Path(__file__).parent / "output" / "tanpura"
+    caf_dir = Path(__file__).parent / "output" / "tanpura_caf"
+    ogg_dir.mkdir(parents=True, exist_ok=True)
+    caf_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Generating tanpura files in: {output_dir}")
-    print(
-        f"Total files to generate: {len(SA_FREQUENCIES)} Sa values × {len(STRING1_NOTES)} String 1 notes = {len(SA_FREQUENCIES) * len(STRING1_NOTES)}"
-    )
+    total_files = len(SA_FREQUENCIES) * len(STRING1_NOTES)
+    print(f"Generating {total_files} tanpura files in OGG + CAF formats...")
+    print(f"  OGG → {ogg_dir}")
+    print(f"  CAF → {caf_dir}")
     print()
 
     file_count = 0
-    total_files = len(SA_FREQUENCIES) * len(STRING1_NOTES)
 
     # Generate all combinations
     for sa_name, sa_freq in SA_FREQUENCIES.items():
         for string1_note in STRING1_NOTES:
             file_count += 1
-            filename = f"{sa_name}_{string1_note}.ogg"
-            filepath = output_dir / filename
+            stem = f"{sa_name}_{string1_note}"
 
-            print(f"[{file_count}/{total_files}] Generating {filename}...")
+            print(f"[{file_count}/{total_files}] Generating {stem}...")
             print(f"  Sa = {sa_freq:.2f} Hz, String 1 = {string1_note}")
 
-            # Generate the audio
+            # Generate the audio once, write to both formats
             audio_data = generate_tanpura_cycle(sa_freq, string1_note)
 
-            # Save as OGG Vorbis
-            print(f"  Writing to {filename}...")
-            sf.write(filepath, audio_data, SAMPLE_RATE, format="OGG", subtype="VORBIS")
+            sf.write(ogg_dir / f"{stem}.ogg", audio_data, SAMPLE_RATE,
+                     format="OGG", subtype="VORBIS")
+            print(f"  ✓ OGG written")
 
-            print(f"  ✓ Complete\n")
+            _, tmp_name = tempfile.mkstemp(suffix=".wav")
+            tmp_path = Path(tmp_name)
+            try:
+                sf.write(tmp_path, audio_data, SAMPLE_RATE, format="WAV", subtype="PCM_16")
+                subprocess.run(
+                    [
+                        "afconvert",
+                        str(tmp_path),
+                        str(caf_dir / f"{stem}.caf"),
+                        "-f", "caff",   # CAF container
+                        "-d", "aac",    # AAC codec
+                        "-b", "128000", # 128 kbps
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            finally:
+                tmp_path.unlink(missing_ok=True)
+            print(f"  ✓ CAF written\n")
 
     print(f"\n{'=' * 60}")
-    print(f"Generation complete! {total_files} files created.")
-    print(f"Output directory: {output_dir}")
+    print(f"Generation complete! {total_files} × 2 formats.")
     print(f"{'=' * 60}")
 
 

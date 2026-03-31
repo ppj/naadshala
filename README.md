@@ -10,10 +10,11 @@ Audio generation tools for Hindustani classical music applications.
 
 Generates realistic tanpura drone sounds using additive synthesis.
 
-- **Output:** OGG Vorbis files (~10 seconds each)
-- **Coverage:** 15 Sa values (G#2 to A#3) x 3 String 1 options (P, m, N) = 45 files
+- **Output:** OGG Vorbis → `output/tanpura/` (Android); CAF/AAC → `output/tanpura_caf/` (iOS)
+- **Coverage:** 15 Sa values (G#2 to A#3) x 3 String 1 options (P, m, N) = 45 files per format
 - **Harmonic structure:** Extracted from real Calcutta-standard male tanpura via spectral analysis
 - **Key feature:** Authentic jawari effect with H7 as dominant harmonic
+- **Requirement:** CAF output requires macOS (`afconvert`, pre-installed); OGG output works on any platform
 
 ### generate_reference_plucks.py
 
@@ -44,7 +45,7 @@ python generate_tanpura_files.py
 python generate_reference_plucks.py
 ```
 
-Output files are written to `./output/tanpura/` and `./output/plucks/` by default.
+Output files are written to `./output/tanpura/`, `./output/tanpura_caf/`, and `./output/plucks/` by default.
 
 ## Audio Configuration
 
