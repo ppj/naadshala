@@ -5,7 +5,7 @@ Creates 45 files: 3 String 1 notes (P, m, N) × 15 Sa values (G#2 to A#3)
 
 Outputs two formats:
   - OGG Vorbis → output/tanpura/          (Android / Swaramandal)
-  - CAF/AAC    → output/tanpura_caf/       (iOS / iSwarmandal)
+  - CAF/ALAC   → output/tanpura_caf/       (iOS / iSwarmandal, lossless)
     Requires macOS afconvert (pre-installed on all Macs, not available on Linux).
 
 Harmonic structure extracted from real Calcutta-standard male tanpura recording
@@ -174,6 +174,9 @@ def generate_string_pluck(
         delay_line[read_pos] = JAWARI_DAMPING * 0.5 * (y + delay_line[next_pos])
         read_pos = next_pos
 
+    # Remove DC offset from asymmetric bridge termination.
+    output -= np.mean(output)
+
     # Apply attack envelope for smooth onset
     attack = 1.0 / (1.0 + np.exp(-10.0 * (t / attack_duration - 0.5)))
     output *= attack * amplitude_variation * volume
@@ -251,6 +254,11 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
         right_index = (i + stereo_timing_offset) % cycle_size
         stereo_buffer[i, 1] = mono_buffer[right_index] * panning_r
 
+    # Final peak normalization (leave 10% headroom for DAC)
+    actual_peak = np.max(np.abs(stereo_buffer))
+    if actual_peak > 0:
+        stereo_buffer *= 0.9 / actual_peak
+
     return stereo_buffer
 
 
@@ -278,33 +286,44 @@ def main():
             print(f"[{file_count}/{total_files}] Generating {stem}...")
             print(f"  Sa = {sa_freq:.2f} Hz, String 1 = {string1_note}")
 
-            # Generate the audio once, write to both formats
             audio_data = generate_tanpura_cycle(sa_freq, string1_note)
-
-            sf.write(ogg_dir / f"{stem}.ogg", audio_data, SAMPLE_RATE,
-                     format="OGG", subtype="VORBIS")
-            print(f"  ✓ OGG written")
 
             _, tmp_name = tempfile.mkstemp(suffix=".wav")
             tmp_path = Path(tmp_name)
             try:
                 sf.write(tmp_path, audio_data, SAMPLE_RATE, format="WAV", subtype="PCM_16")
+
+                # OGG Vorbis via ffmpeg (max quality for spectrally dense waveguide output)
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y",
+                        "-i", str(tmp_path),
+                        "-c:a", "libvorbis",
+                        "-q:a", "10",
+                        str(ogg_dir / f"{stem}.ogg"),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                print(f"  ✓ OGG written")
+
+                # CAF/ALAC (lossless) via macOS afconvert
                 subprocess.run(
                     [
                         "afconvert",
                         str(tmp_path),
                         str(caf_dir / f"{stem}.caf"),
                         "-f", "caff",   # CAF container
-                        "-d", "aac",    # AAC codec
-                        "-b", "128000", # 128 kbps
+                        "-d", "alac",   # Apple Lossless
                     ],
                     check=True,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+                print(f"  ✓ CAF written\n")
             finally:
                 tmp_path.unlink(missing_ok=True)
-            print(f"  ✓ CAF written\n")
 
     print(f"\n{'=' * 60}")
     print(f"Generation complete! {total_files} × 2 formats.")
