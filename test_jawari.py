@@ -3,7 +3,7 @@
 Generate test files for jawari verification in multiple formats.
 Creates 3 test cases (gs2_P, c3_P, a3_P) as:
   - Single-cycle OGG (what Android app plays)
-  - Single-cycle CAF/AAC (what iOS app plays)
+  - Single-cycle CAF/ALAC (what iOS app plays)
   - 5x-looped WAV (for direct listening comparison)
 """
 
