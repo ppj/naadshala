@@ -129,7 +129,7 @@ JAWARI_DAMPING = 0.999         # waveguide feedback coefficient (higher = longer
 # Standard Karplus-Strong uses 0.5 (averaging filter), which destroys upper
 # harmonics over time. 0.02 was too bright/harsh. 0.15 is a warm middle ground.
 # Per-pass gain at freq f = 1 - blend * (1 - cos(2πf/fs))
-LOOP_FILTER_BLEND = 0.15      # 0.5 = dark, 0.02 = harsh, 0.15 = warm
+LOOP_FILTER_BLEND = 0.12      # 0.5 = dark, 0.02 = harsh, 0.12 = warm-bright
 
 # String detuning — real tanpura Sa strings are never perfectly in tune.
 # Slight detuning creates beating that produces the characteristic shimmer.
@@ -155,7 +155,7 @@ BODY_RESONANCES = [
     # (center_freq_hz, Q, gain_dB) — boost jawari frequencies for crispness
     (675,  8,  3.5),   # primary body mode near H4-H5
     (1374, 10, 3.0),   # secondary mode — jawari shimmer region
-    (2246, 12, 3.0),   # tertiary mode — presence/definition
+    (2246, 12, 4.0),   # tertiary mode — presence/metallic definition
 ]
 
 
