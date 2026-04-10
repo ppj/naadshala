@@ -12,19 +12,16 @@ Per prior experience (12+ failed additive synthesis attempts), waveguide with br
 
 ## Analysis Summary (from real sample reverse-engineering)
 
-| Metric | Real | Generated | Gap |
-|--------|------|-----------|-----|
-| Spectral centroid | 2512 Hz | 664 Hz | 4x darker |
-| Brightness (>1kHz) | 28.1% | 2.7% | 10x less |
-| H4 amplitude (normalized) | 1.000 | 0.013 | 100x too quiet |
-| H7 amplitude | 0.985 | 0.161 | 6x too quiet |
-| Attack time (10-90%) | 27ms | 900ms | 33x slower |
-| Decay shape | Non-monotonic swells | Monotonic | Missing jawari swells |
-| AM rate (overall) | 3.33 Hz | None | Missing modulation |
-| Body resonances | 675, 1374, 2246, 4732 Hz | None | No body model |
-| Inharmonicity B | 0.00005 | 0 | No string stiffness |
-| Stereo width | 12.9% | ~50% | Too wide |
-| Energy >5kHz | 0.45% | 0.00% | No HF content |
+| Metric | Real | Generated (before) | After | Status |
+|--------|------|-------------------|-------|--------|
+| Spectral centroid | 2512 Hz | 664 Hz | 1040 Hz | Improved (still below target) |
+| Brightness (>1kHz) | 28.1% | 2.7% | 34.8% | **Target met** |
+| H4 amplitude (normalized) | 1.000 | 0.013 | 0.702 | **Fixed** (was 100x too quiet) |
+| H7 amplitude | 0.985 | 0.161 | 0.364 | Improved |
+| Attack time (10-90%) | 27ms | 900ms | ~27ms | **Target met** |
+| Body resonances | 675, 1374, 2246, 4732 Hz | None | 675, 1374, 2246 Hz | Added |
+| Stereo Haas delay | N/A | 20ms | 3ms | Fixed (comb filter eliminated) |
+| Energy >5kHz | 0.45% | 0.00% | 0.35% | **Target met** |
 
 ### Jawari Harmonic Oscillation (key finding)
 
@@ -46,221 +43,75 @@ The real tanpura shows periodic amplitude *increases* during decay (jawari swell
 - Pluck at t=1.0s: RMS starts 0.172, drops to 0.130 at +500ms, then **rises to 0.285** at +1250ms
 - This is caused by energy transfer between harmonics via bridge interaction
 
-## Steps
+## Steps (all completed)
 
-### Step 1: Replace the loop filter (fixes brightness — the #1 problem)
+### Step 1: Replace the loop filter ✅
+Replaced averaging filter `0.5 * (y + next)` with tunable one-pole: `LOOP_FILTER_BLEND = 0.02`.
+Commit: `7f17bc5`
 
-**File:** `generate_tanpura_files.py:174`
+### Step 2: Fix the attack envelope ✅
+Replaced 900ms sigmoid with 8ms exponential tau (27ms 10-90% rise).
+Commit: `7f17bc5`
 
-Replace the averaging filter `0.5 * (y + delay_line[next_pos])` with a tunable one-pole lowpass:
+**Deviation:** Noise transient was added initially but later removed — it corrupted phase alignment at shared frequencies between strings, reducing H4 in the mix.
 
-```python
-# Old: delay_line[read_pos] = JAWARI_DAMPING * 0.5 * (y + delay_line[next_pos])
-# New:
-LOOP_FILTER_BLEND = 0.02  # 0.5 = original (dark), 0.02 = bright, preserves upper harmonics
-...
-delay_line[read_pos] = JAWARI_DAMPING * ((1 - LOOP_FILTER_BLEND) * y + LOOP_FILTER_BLEND * delay_line[next_pos])
-```
+### Step 3: Lower bridge + curved surface + jiva thread ✅
+- Bridge height: 0.3 → 0.12 (more string-bridge contact)
+- Added curved bridge reflection (`JAWARI_BRIDGE_CURVE = 0.4`)
+- **Added jiva thread** (upper bridge at 0.15) — not in original plan
 
-**Why this works:** Per-pass gain at frequency f = `1 - blend * (1 - cos(2πf/fs))`. With blend=0.02 after one 3.6s cycle (~471 passes for C3):
-- H1 (131 Hz): retains 98.8% → strong fundamental
-- H4 (523 Hz): retains 96.0% → preserved (was being destroyed)
-- H7 (916 Hz): retains 94.4% → preserved (was being destroyed)
-- H17 (2224 Hz): retains 85.8% → now audible (was 0%)
+Commits: `45758fa`, `3de3deb`
 
-Compare with current blend=0.5: H4 retains 72%, H7 retains 54%, H17 retains 9%.
+**Deviation — Jiva thread:** One-sided bridge (lower only) suppresses even harmonics. Real tanpura has a cotton thread (jiva) that creates upper-side contact too. Two-sided nonlinearity is essential for strong H4. `JAWARI_JIVA_HEIGHT = 0.15`.
 
-Combined with JAWARI_DAMPING=0.999 (which gives ~62.5% overall at 3.6s), the harmonics now maintain reasonable levels within the audible cycle.
+### Step 4: Body resonance ✅
+- **Deviation:** Original plan had aggressive gains (6dB, 3dB, 4.5dB, 2dB at 4 modes). This made brightness 76.4% — way too bright. Replaced with gentle first-order lowpass rolloff at 1800 Hz + subtle peaks (1.5dB, 1.0dB, 1.5dB at 3 modes). Removed 4732 Hz resonance (unnecessary with bright waveguide).
+- Applied post-mix (body colors the combined string sound, not individual strings).
 
-### Step 2: Fix the attack envelope (fixes pluck character)
+Commit: `3de3deb`
 
-**File:** `generate_tanpura_files.py:180-182`
+### Step 5: String detuning ✅
+Sa String 3 detuned by 0.4 Hz (`SA_STRINGS_DETUNE_HZ = 0.4`). Creates H7 beating at 2.8 Hz matching measured 2.86 Hz.
+Commit: `3de3deb`
 
-Remove the 630-900ms sigmoid and replace with a fast natural pluck attack:
+**Additional fix in this commit — string duration wrapping bug:**
+Strings were 10s long but the cycle buffer is only 3.6s. Wrapping via `(offset + i) % cycle_size` caused each string to overlap itself ~2.78 times, creating harmonic-dependent destructive self-interference. H4 at 523 Hz wrapped with `cos(2π × 0.664) = -0.51` — destructive. Fix: generate strings for exactly `CYCLE_DURATION` instead of `SUSTAIN_DURATION`.
 
-```python
-# Old: attack = 1.0 / (1.0 + np.exp(-10.0 * (t / attack_duration - 0.5)))
-# New: fast exponential onset matching measured 27ms (10-90%) rise time
-attack_tau = 0.008  # ~8ms time constant → 27ms 10-90% rise
-attack = 1.0 - np.exp(-t / attack_tau)
-```
+**Additional fix — per-string normalization removed:**
+Peak normalization per string was distorting harmonic ratios at mix time. Sa H4 (523 Hz) and lower Sa H8 (523 Hz) share the same frequency — normalizing each string independently changes their relative amplitudes, destroying H4 in the final mix. Removed per-string normalization; final mix normalization handles overall level.
 
-Also add a brief noise transient (first 30ms) to match the measured broadband attack spectrum (peaks at 500, 900, 1200, 2500 Hz):
+### Step 6: Update HARMONICS array ✅
+Updated from real sample FFT analysis. H4 now strongest in excitation (1.00). Extended to H25/H30 for >5kHz content.
+Commit: `3f934eb`
 
-```python
-noise_duration = int(0.03 * SAMPLE_RATE)  # 30ms
-noise = rng.randn(noise_duration) * 0.15
-noise_env = np.exp(-np.arange(noise_duration) / (0.01 * SAMPLE_RATE))
-output[:noise_duration] += noise * noise_env
-```
+### Step 7: Fix stereo imaging ✅
+- Haas delay: 20ms → 3ms (old delay created comb filter at H4: gain factor 0.166)
+- Panning: 0.75/0.75 → 0.92/0.88 (narrower, slight L>R asymmetry)
 
-Remove the `attack_duration` parameter from `generate_string_pluck` signature (all strings now get the natural fast attack).
+Commit: `3f934eb`
 
-### Step 3: Lower the bridge and add curved surface (fixes jawari strength)
+### Step 8: Add scipy ✅
+Added to `requirements.txt`. Commit: `3de3deb`
 
-**File:** `generate_tanpura_files.py:119, 164-170`
+### Step 9: Adjust pluck timing ✅
+Beat interval: 0.6s → 0.4s (tighter rhythm matching real tanpura).
+Commit: `3f934eb`
 
-The current bridge height (0.3) is too high — less of the waveform crosses it, producing weak jawari. Lower it and add a curved bridge surface for richer harmonic interaction:
+## Key Discoveries During Implementation
 
-```python
-JAWARI_BRIDGE_HEIGHT = 0.12    # Lower → more string-bridge contact → stronger jawari
-JAWARI_BRIDGE_CURVE = 0.4      # Curvature of bridge surface (0 = flat, 1 = very curved)
-```
+1. **Wrapping self-interference:** The single biggest H4 killer was 10s strings wrapped into a 3.6s cycle buffer. Phase alignment at wrap boundaries is harmonic-dependent — H4 happened to wrap destructively for C3 Sa.
 
-Replace the hard reflection with a curved bridge model:
+2. **Per-string normalization hazard:** Normalizing each string independently before mixing destroys harmonic ratios at shared frequencies. Sa H4 and lower Sa H8 are both at 523 Hz — changing their relative amplitudes cancels H4 in the mix.
 
-```python
-# Old: if y < -bridge: y = -2.0 * bridge - y
-# New: curved bridge with gradual wrapping
-if y < -bridge:
-    penetration = -(y + bridge)
-    # Curved surface: reflection softens with deeper penetration
-    reflected = penetration * (1.0 - JAWARI_BRIDGE_CURVE * min(penetration, 1.0))
-    y = -bridge + reflected
-```
+3. **Jiva thread necessity:** One-sided bridge nonlinearity (lower only) preferentially generates odd harmonics. Even harmonics (H4, H2) require symmetric nonlinearity from the jiva cotton thread on the upper side.
 
-The curved surface creates softer, frequency-dependent nonlinearity that produces the observed periodic H4↔H7 trading (measured ~250ms oscillation period in the real sample). Hard flat reflection creates harsh buzzing; curved reflection creates the shimmering jawari character.
+4. **Haas delay as comb filter:** A 20ms stereo delay creates a comb filter with nulls at `n/(2×0.020) = 25, 75, 125...` Hz when summed to mono. For C3 Sa, H4 at 523 Hz falls near a null (gain factor 0.166). Even 3ms creates some comb effect, but much milder.
 
-### Step 4: Add body resonance filter (shapes spectral envelope)
+5. **Body resonance calibration:** The initial resonance gains from FFT peak analysis (6dB, 3dB, 4.5dB, 2dB) were far too aggressive when applied to the already-bright waveguide output. Gentle rolloff + subtle peaks (1-1.5dB) is the right approach.
 
-**File:** `generate_tanpura_files.py` — new function, called from `generate_string_pluck`
+## Remaining Opportunities (not implemented)
 
-The tanpura body (gourd + wood) acts as a resonant acoustic filter. Four resonance peaks were measured from the real sample's spectral envelope:
-
-```python
-from scipy.signal import iirpeak, lfilter
-
-BODY_RESONANCES = [
-    (675,  8,  6.0),   # (freq_hz, Q, gain_dB) — strongest, boosts H4-H5 region
-    (1374, 10, 3.0),   # boosts H9-H11 region
-    (2246, 12, 4.5),   # boosts H17 region
-    (4732, 15, 2.0),   # adds air/presence
-]
-
-def apply_body_resonance(signal, sample_rate):
-    """Apply tanpura body resonance (post-waveguide acoustic coloring)."""
-    output = signal.copy()
-    for freq, q, gain_db in BODY_RESONANCES:
-        b, a = iirpeak(freq / (sample_rate / 2), q)
-        gain = 10 ** (gain_db / 20)
-        output += (gain - 1) * lfilter(b, a, signal)
-    return output
-```
-
-Call at the end of `generate_string_pluck`, before normalization. This shapes the waveguide output into the characteristic tanpura spectral envelope — boosting the H4 region above H7, matching the real sample's balance.
-
-### Step 5: Add string detuning for Sa-Sa beating (creates shimmer)
-
-**File:** `generate_tanpura_files.py:199`
-
-The real sample shows amplitude modulation at 0.95 Hz on H1 and 2.86 Hz on H7. Two Sa strings (Strings 2 & 3) with slight detuning produce beating at these rates:
-
-```python
-# Old: string3_freq = sa_frequency
-# New: detune by 0.4 Hz for natural beating
-STRINGS_2_3_DETUNE_HZ = 0.4
-...
-string3_freq = sa_frequency + STRINGS_2_3_DETUNE_HZ
-```
-
-This gives:
-- H1 beating at 0.4 Hz (contributes to the 0.95 Hz AM along with bridge effects)
-- H7 beating at 7 × 0.4 = 2.8 Hz (matches measured 2.86 Hz AM on H7)
-
-### Step 6: Update the HARMONICS array from the new real sample
-
-**File:** `generate_tanpura_files.py:91-112`
-
-Update the initial excitation spectrum to match the real sample (currently based on a different recording). Key changes based on FFT analysis:
-
-```python
-HARMONICS = [
-    (1.0, 0.20),   # was 0.26
-    (2.0, 0.35),   # was 0.26 — real H2 is stronger
-    (3.0, 0.06),   # was 0.04
-    (4.0, 1.00),   # was 0.81 — H4 IS the strongest in real sample
-    (5.0, 0.53),   # was 0.49
-    (6.0, 0.41),   # was 0.49
-    (7.0, 0.99),   # was 1.00 — H4 and H7 are nearly equal
-    (8.0, 0.31),   # was 0.24
-    (9.0, 0.30),   # was 0.54 — was overestimated
-    (10.0, 0.15),  # was 0.34
-    (11.0, 0.19),  # was 0.45
-    (12.0, 0.07),  # was 0.08
-    (13.0, 0.07),  # was 0.07
-    (14.0, 0.01),  # was 0.04
-    (15.0, 0.02),  # was 0.03
-    (16.0, 0.05),  # was 0.05
-    (17.0, 0.20),  # was 0.33 — still significant (jawari)
-    (18.0, 0.02),  # was 0.05
-    (19.0, 0.15),  # was 0.28
-    (20.0, 0.02),  # was 0.09
-    # Extended harmonics for HF content (real has 0.45% energy >5kHz)
-    (25.0, 0.01),
-    (30.0, 0.005),
-]
-```
-
-### Step 7: Fix stereo imaging
-
-**File:** `generate_tanpura_files.py:245-255`
-
-Replace uniform 20ms Haas delay with narrower stereo:
-
-```python
-# Target: ~13% stereo width (measured 12.9% in real sample)
-stereo_timing_offset = int(SAMPLE_RATE * 0.003)  # 3ms (was 20ms)
-panning_l = 0.92   # was 0.75
-panning_r = 0.88   # was 0.75 (slight L>R asymmetry like real recording)
-```
-
-### Step 8: Add scipy to requirements.txt
-
-**File:** `requirements.txt`
-
-Add `scipy` (needed for body resonance filters in Step 4).
-
-### Step 9: Adjust pluck timing to better match real tanpura
-
-**File:** `generate_tanpura_files.py:46-47`
-
-The real sample shows faster plucking (~0.33s between rapid plucks) vs current 0.6s:
-
-```python
-BEAT_INTERVAL = 0.4    # was 0.6 — tighter rhythm matching real playing
-```
-
-This is a tuning parameter — may need ear-testing.
-
-## Files to Modify
-
-1. `generate_tanpura_files.py` — all synthesis changes (Steps 1-7, 9)
-2. `requirements.txt` — add scipy (Step 8)
-
-## Files to Preserve (interface unchanged)
-
-- `test_jawari.py` — imports `SA_FREQUENCIES`, `SAMPLE_RATE`, `generate_tanpura_cycle`. All preserved.
-- Output directory structure and file naming unchanged.
-
-## Verification
-
-After implementation, run this validation sequence:
-
-1. **Generate test files:** `python test_jawari.py`
-2. **A/B listen:** Compare `output/test_jawari/c3_P_x5.wav` with `c3_P real.wav`
-3. **Spectral validation** (run inline or as a script):
-   - Spectral centroid should be 2000-3000 Hz (was 664, target ~2500)
-   - Brightness (>1kHz) should be 20-35% (was 2.7%, target ~28%)
-   - H4 should be the strongest or near-strongest harmonic (was 100x too quiet)
-   - H7 should be within 3dB of H4 (was 6x too quiet)
-   - Attack time should be 20-40ms (was 900ms)
-   - Energy above 5kHz should be >0.1% (was 0.00%)
-4. **Generate full set:** `python generate_tanpura_files.py` — verify 45 OGG + 45 CAF files produced
-5. **Regression check:** `python test_jawari.py` still works (preserved imports/signatures)
-
-## Priority
-
-- **Steps 1-3** address the biggest perceptual gaps (brightness, attack, jawari strength). These alone would be a massive improvement.
-- **Steps 4-7** add realism layers (body resonance, beating, spectral balance, stereo).
-- **Steps 8-9** are supporting changes.
-- All parameter values are starting points derived from analysis — expect iterative tuning by ear after implementation.
+- Spectral centroid (1040 Hz) is still below the real sample (2512 Hz) — H1 is currently dominant where H4 should be
+- Stereo width metric is not yet matching real sample's 12.9%
+- Inharmonicity (string stiffness) not modeled
+- Non-monotonic decay swells (jawari energy transfer) — partially emergent from bridge nonlinearity but not as pronounced as real sample
