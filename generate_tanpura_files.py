@@ -134,7 +134,7 @@ LOOP_FILTER_BLEND = 0.15      # 0.5 = dark, 0.02 = harsh, 0.15 = warm
 # String detuning — real tanpura Sa strings are never perfectly in tune.
 # Slight detuning creates beating that produces the characteristic shimmer.
 # 0.4 Hz gives H1 beating at 0.4 Hz, H7 beating at 2.8 Hz (matches measured 2.86 Hz).
-SA_STRINGS_DETUNE_HZ = 0.4
+SA_STRINGS_DETUNE_HZ = 0.15
 
 # Body resonance — tanpura gourd + wood body shapes the waveguide output.
 # The body acts as an acoustic filter: gentle high-frequency rolloff (wood/gourd
@@ -168,7 +168,7 @@ def apply_body_resonance(signal):
 
 
 def generate_string_pluck(
-    frequency, duration, amplitude_variation=1.0, volume=0.5
+    frequency, duration, amplitude_variation=1.0, volume=0.5, pluck_level=0.25
 ):
     """
     Generate a single string pluck using waveguide synthesis with bridge termination.
@@ -245,8 +245,7 @@ def generate_string_pluck(
 
     # Pluck suppression: dims the initial transient while keeping sustain full.
     # Starts at PLUCK_LEVEL, rises to 1.0 over ~300ms.
-    PLUCK_LEVEL = 0.4  # pluck is 40% of sustain volume
-    pluck_shape = PLUCK_LEVEL + (1.0 - PLUCK_LEVEL) * (1.0 - np.exp(-t / 0.3))
+    pluck_shape = pluck_level + (1.0 - pluck_level) * (1.0 - np.exp(-t / 0.15))
 
     output *= attack * pluck_shape * amplitude_variation * volume
 
