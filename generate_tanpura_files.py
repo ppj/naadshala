@@ -44,7 +44,7 @@ import soundfile as sf
 # Audio configuration
 SAMPLE_RATE = 44100
 SUSTAIN_DURATION = 10.0  # seconds per string (used by non-tanpura generators if needed)
-BEAT_INTERVAL = 0.6  # 100 BPM
+BEAT_INTERVAL = 0.4  # tighter rhythm matching real tanpura playing (was 0.6)
 CYCLE_BEATS = 6
 CYCLE_DURATION = BEAT_INTERVAL * CYCLE_BEATS
 
@@ -90,26 +90,29 @@ STRING1_NOTES = ["P", "m", "N"]
 # Source: https://www.india-instruments.com/tanpura-details/calcutta-standard-male-tanpura.html
 # Key finding: H7 is dominant (1.00) representing the authentic jawari effect
 HARMONICS = [
-    (1.0, 0.26),  # Fundamental
-    (2.0, 0.26),  # Octave
-    (3.0, 0.04),  # Fifth
-    (4.0, 0.81),  # Jawari cluster
-    (5.0, 0.49),
-    (6.0, 0.49),
-    (7.0, 1.00),  # Dominant jawari peak
-    (8.0, 0.24),
-    (9.0, 0.54),  # Secondary peak
-    (10.0, 0.34),
-    (11.0, 0.45),
-    (12.0, 0.08),
+    (1.0, 0.20),   # Fundamental (was 0.26)
+    (2.0, 0.35),   # Octave — real H2 is stronger (was 0.26)
+    (3.0, 0.06),   # Fifth (was 0.04)
+    (4.0, 1.00),   # H4 IS the strongest in real sample (was 0.81)
+    (5.0, 0.53),   # (was 0.49)
+    (6.0, 0.41),   # (was 0.49)
+    (7.0, 0.99),   # Nearly equal to H4 — jawari peak (was 1.00)
+    (8.0, 0.31),   # (was 0.24)
+    (9.0, 0.30),   # Was overestimated (was 0.54)
+    (10.0, 0.15),  # (was 0.34)
+    (11.0, 0.19),  # (was 0.45)
+    (12.0, 0.07),  # (was 0.08)
     (13.0, 0.07),
-    (14.0, 0.04),
-    (15.0, 0.03),
+    (14.0, 0.01),  # (was 0.04)
+    (15.0, 0.02),  # (was 0.03)
     (16.0, 0.05),
-    (17.0, 0.33),  # Tertiary peak
-    (18.0, 0.05),
-    (19.0, 0.28),
-    (20.0, 0.09),
+    (17.0, 0.20),  # Jawari tertiary peak (was 0.33)
+    (18.0, 0.02),  # (was 0.05)
+    (19.0, 0.15),  # (was 0.28)
+    (20.0, 0.02),  # (was 0.09)
+    # Extended harmonics for HF content (real has 0.45% energy >5kHz)
+    (25.0, 0.01),
+    (30.0, 0.005),
 ]
 
 # Jawari configuration — waveguide bridge termination
@@ -313,10 +316,11 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
     if max_amp > 0.85:
         mono_buffer *= 0.85 / max_amp
 
-    # Create stereo with Haas effect (20ms delay)
-    stereo_timing_offset = int(SAMPLE_RATE * 0.020)
-    panning_l = 0.75
-    panning_r = 0.75
+    # Create stereo with Haas effect (3ms delay, ~13% width matching real sample)
+    # Old 20ms delay created a comb filter that destroyed H4 in mono sum
+    stereo_timing_offset = int(SAMPLE_RATE * 0.003)
+    panning_l = 0.92
+    panning_r = 0.88  # slight L>R asymmetry like real recording
     stereo_buffer = np.zeros((cycle_size, 2))
 
     for i in range(cycle_size):
