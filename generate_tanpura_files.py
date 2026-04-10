@@ -143,10 +143,10 @@ SA_STRINGS_DETUNE_HZ = 0.15
 BODY_ROLLOFF_FREQ = 1800       # lowpass cutoff for body absorption (Hz)
 BODY_ROLLOFF_ORDER = 1         # gentle first-order rolloff
 BODY_RESONANCES = [
-    # (center_freq_hz, Q, gain_dB) — subtle peaks, not dramatic boosts
-    (675,  8,  1.5),   # primary body mode near H4-H5
-    (1374, 10, 1.0),   # secondary mode
-    (2246, 12, 1.5),   # tertiary mode (preserves H17 presence)
+    # (center_freq_hz, Q, gain_dB) — boost jawari frequencies for crispness
+    (675,  8,  3.5),   # primary body mode near H4-H5
+    (1374, 10, 3.0),   # secondary mode — jawari shimmer region
+    (2246, 12, 3.0),   # tertiary mode — presence/definition
 ]
 
 
