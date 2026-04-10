@@ -240,9 +240,15 @@ def generate_string_pluck(
     output -= np.mean(output)
 
     # Gentle exponential attack — soft pluck onset that blends into the drone
-    attack_tau = 0.15  # ~150ms time constant
+    attack_tau = 0.08  # ~80ms time constant
     attack = 1.0 - np.exp(-t / attack_tau)
-    output *= attack * amplitude_variation * volume
+
+    # Pluck suppression: dims the initial transient while keeping sustain full.
+    # Starts at PLUCK_LEVEL, rises to 1.0 over ~300ms.
+    PLUCK_LEVEL = 0.4  # pluck is 40% of sustain volume
+    pluck_shape = PLUCK_LEVEL + (1.0 - PLUCK_LEVEL) * (1.0 - np.exp(-t / 0.3))
+
+    output *= attack * pluck_shape * amplitude_variation * volume
 
     # No per-string normalization — preserves natural waveguide amplitude balance.
     # Per-string peak/RMS normalization distorts harmonic ratios at mix time by
@@ -263,48 +269,64 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
     string3_freq = sa_frequency + SA_STRINGS_DETUNE_HZ
     string4_freq = sa_frequency / 2.0
 
-    # Generate strings for exactly one cycle duration.
-    # CRITICAL: string duration must equal cycle duration (3.6s) to avoid
-    # destructive self-interference from wrapping. A 10s string wrapped into
-    # a 3.6s buffer overlaps itself ~2.78 times, and the phase alignment at
-    # wrap boundaries is harmonic-dependent — H4 wraps with cos=-0.51
-    # (destructive), which is why H4 was 100x too quiet.
+    # Generate strings for full sustain duration (10s). Long strings ring
+    # across cycle boundaries, building up the continuous drone bed that
+    # makes plucks blend in naturally — just like a real tanpura.
     print(f"  Generating String 1 ({string1_note})...")
     string1_samples = generate_string_pluck(
-        string1_freq, CYCLE_DURATION, amplitude_variation=0.98
+        string1_freq, SUSTAIN_DURATION, amplitude_variation=0.98
     )
 
     print(f"  Generating String 2 (Sa)...")
     string2_samples = generate_string_pluck(
-        string2_freq, CYCLE_DURATION, amplitude_variation=1.0
+        string2_freq, SUSTAIN_DURATION, amplitude_variation=1.0
     )
 
     print(f"  Generating String 3 (Sa)...")
     string3_samples = generate_string_pluck(
-        string3_freq, CYCLE_DURATION, amplitude_variation=1.0
+        string3_freq, SUSTAIN_DURATION, amplitude_variation=1.0
     )
 
     print(f"  Generating String 4 (lower Sa)...")
     string4_samples = generate_string_pluck(
-        string4_freq, CYCLE_DURATION, amplitude_variation=0.96
+        string4_freq, SUSTAIN_DURATION, amplitude_variation=0.96
     )
 
     # Mix strings with traditional plucking pattern (beats: 1, -, 3, 4, 5, -)
     pluck_offsets = [0, 2, 3, 4]  # String1, String2, String3, String4
     all_strings = [string1_samples, string2_samples, string3_samples, string4_samples]
 
-    # Create mono buffer for one complete cycle
     beat_interval_samples = int(SAMPLE_RATE * BEAT_INTERVAL)
     cycle_size = int(SAMPLE_RATE * CYCLE_DURATION)
-    mono_buffer = np.zeros(cycle_size)
 
-    # Mix all strings with their timing offsets
-    for string_index, string_samples in enumerate(all_strings):
-        offset = pluck_offsets[string_index] * beat_interval_samples
-        for i in range(len(string_samples)):
-            # Wrap around if string extends beyond cycle boundary
-            buffer_index = (offset + i) % cycle_size
-            mono_buffer[buffer_index] += string_samples[i]
+    # Mix into a 3-cycle buffer WITHOUT modular wrapping.
+    # String tails naturally extend across cycle boundaries, creating the
+    # continuous drone bed that makes plucks blend in naturally.
+    # (Old approach wrapped via % cycle_size, causing harmonic-dependent
+    # self-interference that destroyed H4.)
+    mix_size = cycle_size * 3
+    mix_buffer = np.zeros(mix_size)
+
+    for cycle_num in range(3):
+        for string_index, string_samples in enumerate(all_strings):
+            offset = cycle_num * cycle_size + pluck_offsets[string_index] * beat_interval_samples
+            end = min(offset + len(string_samples), mix_size)
+            length = end - offset
+            if length > 0:
+                mix_buffer[offset:end] += string_samples[:length]
+
+    # Use the SECOND cycle as output — it has the drone bed from cycle 1's
+    # string tails underneath its own plucks.
+    mono_buffer = mix_buffer[cycle_size:cycle_size * 2].copy()
+
+    # Cross-fade for seamless looping: blend the beginning of our cycle
+    # with what naturally follows after our cycle ends (cycle 3's start).
+    # This way, when the loop wraps (end → beginning), the transition is
+    # smooth because the beginning already contains the "continuation."
+    xfade_len = int(0.15 * SAMPLE_RATE)  # 150ms
+    tail = mix_buffer[cycle_size * 2:cycle_size * 2 + xfade_len].copy()
+    fade_in = np.linspace(0.0, 1.0, xfade_len)
+    mono_buffer[:xfade_len] = mono_buffer[:xfade_len] * fade_in + tail * (1.0 - fade_in)
 
     # Apply body resonance to the mixed signal (gourd + wood acoustic coloring)
     # Applied post-mix because the body colors the combined string sound
@@ -328,9 +350,9 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
         right_index = (i + stereo_timing_offset) % cycle_size
         stereo_buffer[i, 1] = mono_buffer[right_index] * panning_r
 
-    # Clip protection only
+    # Final peak normalization (leave 10% headroom for DAC)
     actual_peak = np.max(np.abs(stereo_buffer))
-    if actual_peak > 0.95:
+    if actual_peak > 0:
         stereo_buffer *= 0.9 / actual_peak
 
     return stereo_buffer
