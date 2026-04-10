@@ -119,9 +119,16 @@ HARMONICS = [
 JAWARI_BRIDGE_HEIGHT = 0.3     # bridge distance from rest (lower = more jawari)
 JAWARI_DAMPING = 0.999         # waveguide feedback coefficient (higher = longer sustain)
 
+# Loop filter blend: controls brightness preservation in the waveguide.
+# Standard Karplus-Strong uses 0.5 (averaging filter), which destroys upper
+# harmonics over time. Tanpura needs much lower blend to preserve the bright
+# jawari character (H4-H17 region).
+# Per-pass gain at freq f = 1 - blend * (1 - cos(2πf/fs))
+LOOP_FILTER_BLEND = 0.02      # 0.5 = original dark, 0.02 = bright
+
 
 def generate_string_pluck(
-    frequency, duration, amplitude_variation=1.0, attack_duration=0.8, volume=0.5
+    frequency, duration, amplitude_variation=1.0, volume=0.5
 ):
     """
     Generate a single string pluck using waveguide synthesis with bridge termination.
@@ -169,16 +176,25 @@ def generate_string_pluck(
         if y < -bridge:
             y = -2.0 * bridge - y
 
-        # Lowpass averaging + damping (Karplus-Strong)
+        # Tunable lowpass + damping (modified Karplus-Strong)
+        # Low blend preserves upper harmonics (brightness) unlike standard 0.5 averaging
         next_pos = (read_pos + 1) % period
-        delay_line[read_pos] = JAWARI_DAMPING * 0.5 * (y + delay_line[next_pos])
+        blend = LOOP_FILTER_BLEND
+        delay_line[read_pos] = JAWARI_DAMPING * ((1 - blend) * y + blend * delay_line[next_pos])
         read_pos = next_pos
 
     # Remove DC offset from asymmetric bridge termination.
     output -= np.mean(output)
 
-    # Apply attack envelope for smooth onset
-    attack = 1.0 / (1.0 + np.exp(-10.0 * (t / attack_duration - 0.5)))
+    # Add brief noise transient for realistic pluck attack
+    noise_duration = int(0.03 * SAMPLE_RATE)  # 30ms
+    noise = rng.randn(noise_duration) * 0.15
+    noise_env = np.exp(-np.arange(noise_duration) / (0.01 * SAMPLE_RATE))
+    output[:noise_duration] += noise * noise_env
+
+    # Fast exponential attack matching real tanpura pluck (27ms measured 10-90% rise)
+    attack_tau = 0.008  # ~8ms time constant
+    attack = 1.0 - np.exp(-t / attack_tau)
     output *= attack * amplitude_variation * volume
 
     # Normalize to consistent level
@@ -202,22 +218,22 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
     # Generate individual strings with different attack durations
     print(f"  Generating String 1 ({string1_note})...")
     string1_samples = generate_string_pluck(
-        string1_freq, SUSTAIN_DURATION, amplitude_variation=0.98, attack_duration=0.63
+        string1_freq, SUSTAIN_DURATION, amplitude_variation=0.98
     )
 
     print(f"  Generating String 2 (Sa)...")
     string2_samples = generate_string_pluck(
-        string2_freq, SUSTAIN_DURATION, amplitude_variation=1.0, attack_duration=0.90
+        string2_freq, SUSTAIN_DURATION, amplitude_variation=1.0
     )
 
     print(f"  Generating String 3 (Sa)...")
     string3_samples = generate_string_pluck(
-        string3_freq, SUSTAIN_DURATION, amplitude_variation=1.0, attack_duration=0.90
+        string3_freq, SUSTAIN_DURATION, amplitude_variation=1.0
     )
 
     print(f"  Generating String 4 (lower Sa)...")
     string4_samples = generate_string_pluck(
-        string4_freq, SUSTAIN_DURATION, amplitude_variation=0.96, attack_duration=0.63
+        string4_freq, SUSTAIN_DURATION, amplitude_variation=0.96
     )
 
     # Mix strings with traditional plucking pattern (beats: 1, -, 3, 4, 5, -)
