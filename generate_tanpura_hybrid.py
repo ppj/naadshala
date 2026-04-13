@@ -22,7 +22,7 @@ waveguide output sound lo-fi.
 import subprocess
 import tempfile
 import numpy as np
-from scipy.signal import iirpeak, lfilter, stft, butter, filtfilt
+from scipy.signal import iirpeak, lfilter, butter
 from pathlib import Path
 import soundfile as sf
 
@@ -168,11 +168,9 @@ BODY_RESONANCES = [
     (1400, 6,  7.0),   # metallic shimmer
 ]
 
-# Hybrid synthesis: waveguide -> STFT envelope extraction -> additive rendering
-STFT_WINDOW_MS = 50        # STFT window size in ms
-STFT_HOP_MS = 10           # STFT hop size in ms
+# Hybrid synthesis: waveguide -> envelope extraction -> additive rendering
+ENVELOPE_WINDOW_MS = 50    # Smoothing window for heterodyne envelope extraction (ms)
 NUM_HARMONICS = 22         # Harmonics to extract (covers HARMONICS list range)
-ENVELOPE_SMOOTH_HZ = 20    # Envelope lowpass cutoff to remove frame jitter
 
 
 def apply_body_resonance(signal):
@@ -195,40 +193,39 @@ def apply_body_resonance(signal):
 
 
 def extract_harmonic_envelopes(signal, frequency, num_harmonics, sample_rate):
-    """Extract per-harmonic amplitude envelopes from waveguide output via STFT."""
-    window_size = int(sample_rate * STFT_WINDOW_MS / 1000)
-    hop_size = int(sample_rate * STFT_HOP_MS / 1000)
+    """Extract per-harmonic complex envelopes via heterodyne analysis.
 
-    freqs, times, Zxx = stft(
-        signal, fs=sample_rate, window='hann',
-        nperseg=window_size, noverlap=window_size - hop_size,
-    )
-    magnitudes = np.abs(Zxx)
+    For each harmonic, multiplies the signal by exp(-j*2pi*f*t) to shift
+    that harmonic to DC, then smooths to get the slowly-varying complex
+    envelope. This tracks exact harmonic frequencies without STFT bin
+    alignment issues, and preserves phase (including waveguide inharmonicity).
+    """
+    num_samples = len(signal)
+    t = np.arange(num_samples) / sample_rate
 
-    envelopes = np.zeros((num_harmonics, len(times)))
+    window_len = int(sample_rate * ENVELOPE_WINDOW_MS / 1000)
+    kernel = np.hanning(window_len)
+    kernel /= kernel.sum()
+
+    envelopes = np.zeros((num_harmonics, num_samples), dtype=complex)
 
     for n in range(num_harmonics):
         harmonic_freq = (n + 1) * frequency
         if harmonic_freq >= sample_rate / 2:
             break
-        bin_idx = np.argmin(np.abs(freqs - harmonic_freq))
-        envelopes[n] = magnitudes[bin_idx]
+        shifted = signal * np.exp(-1j * 2 * np.pi * harmonic_freq * t)
+        envelopes[n] = np.convolve(shifted, kernel, mode='same')
 
-    # Smooth envelopes to remove STFT frame jitter
-    envelope_sr = sample_rate / hop_size
-    nyquist = envelope_sr / 2
-    if ENVELOPE_SMOOTH_HZ < nyquist:
-        b_smooth, a_smooth = butter(2, ENVELOPE_SMOOTH_HZ / nyquist)
-        for n in range(num_harmonics):
-            if np.max(envelopes[n]) > 0:
-                envelopes[n] = filtfilt(b_smooth, a_smooth, envelopes[n])
-                envelopes[n] = np.maximum(envelopes[n], 0)
-
-    return envelopes, times
+    return envelopes
 
 
-def render_additive(frequency, envelopes, times, duration, sample_rate):
-    """Render clean audio from sinusoids modulated by waveguide-extracted envelopes."""
+def render_additive(frequency, envelopes, duration, sample_rate):
+    """Render clean audio from complex envelopes extracted via heterodyne.
+
+    Reconstructs each harmonic as 2*Re(envelope * exp(j*2pi*f*t)), which
+    preserves the waveguide's natural phase and inharmonicity while
+    eliminating inter-harmonic noise and delay-line artifacts.
+    """
     num_samples = int(sample_rate * duration)
     t = np.arange(num_samples) / sample_rate
     output = np.zeros(num_samples)
@@ -239,16 +236,12 @@ def render_additive(frequency, envelopes, times, duration, sample_rate):
         harmonic_freq = (n + 1) * frequency
         if harmonic_freq >= sample_rate / 2:
             break
-        if np.max(envelopes[n]) == 0:
+        env = envelopes[n][:num_samples]
+        if np.max(np.abs(env)) == 0:
             continue
 
-        # Interpolate envelope from STFT time resolution to sample resolution
-        envelope_interp = np.interp(t, times, envelopes[n])
-
-        # Generate sinusoid (zero phase for coherent pluck character)
-        sinusoid = np.sin(2.0 * np.pi * harmonic_freq * t)
-
-        output += envelope_interp * sinusoid
+        carrier = np.exp(1j * 2 * np.pi * harmonic_freq * t)
+        output += 2 * np.real(env * carrier)
 
     return output
 
@@ -331,10 +324,10 @@ def generate_string_pluck(frequency, params, volume=0.5, seed_frequency=None):
     waveguide_output -= np.mean(waveguide_output)
 
     # Hybrid pipeline: extract harmonic envelopes, render as clean additive
-    envelopes, envelope_times = extract_harmonic_envelopes(
+    envelopes = extract_harmonic_envelopes(
         waveguide_output, frequency, NUM_HARMONICS, SAMPLE_RATE
     )
-    output = render_additive(frequency, envelopes, envelope_times, duration, SAMPLE_RATE)
+    output = render_additive(frequency, envelopes, duration, SAMPLE_RATE)
     output -= np.mean(output)
 
     # Gentle exponential attack (avoid click at start)
