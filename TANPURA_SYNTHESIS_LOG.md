@@ -71,29 +71,131 @@ These numbers drove the improvement plan. In hindsight, chasing spectral metrics
 
 4. **Spectral metrics ≠ perceptual quality:** A spectrally "accurate" synthesis can sound worse than a less accurate but more musical one. The original warm, dark sound was perceptually closer to a real tanpura than the spectrally "correct" harsh bright version.
 
-## Current Pivot: Reset with Lessons Learned
+## Waveguide Abandoned → Fresh Start with `generate_tanpura_v2.py`
 
-### Approach
+User verdict on final waveguide state: *"sounds like something recorded with technology 70 or 80 years ago"*. Delay-line feedback artifacts are inherent to Karplus-Strong — no parameter tuning can fix the lo-fi quality. Decision: abandon waveguide entirely, start fresh with `generate_tanpura_v2.py`.
 
-Keep the waveguide engine and the additions that genuinely improved it (jiva, body resonance, detuning, updated harmonics, curved bridge). Revert the parameters that made it sound worse (extreme brightness, fast attack, low bridge, short strings). Fix the looping strategy properly.
+Waveguide script preserved as `generate_tanpura_files.py` (commit `1e03ce7`).
 
-### Target parameters
+---
 
-| Parameter | Original | Over-corrected | New target |
-|-----------|----------|----------------|------------|
-| Loop filter blend | 0.5 | 0.02 | 0.15 |
-| Bridge height | 0.3 | 0.12 | 0.20 |
-| Jiva height | (none) | 0.15 | 0.25 |
-| Bridge curve | (none) | 0.4 | 0.4 |
-| Attack | 900ms sigmoid | 8ms exp | ~150ms exp |
-| String duration | 10s (wrapped) | 3.6s | 10s (cross-fade) |
-| Beat interval | 0.6s | 0.4s | 0.6s |
-| Stereo delay | 20ms | 3ms | 3ms |
-| Volume | 0.5 + normalize | 0.5 + normalize | 0.5 + normalize |
+## V2 Experiments (Additive / Resonator Bank)
 
-### Looping strategy
+Target: match Tanpura Droid quality — warm, mellow, metallic jawari buzz, clear plucks, natural string vibration. Must sound good on both Bose QC 35 headphones and Galaxy S22 Ultra speakers.
 
-Old: generate strings for cycle duration, wrap via `(offset + i) % cycle_size`.
-Problem: either self-interference (long strings) or no drone bed (short strings).
+### Experiment 1: Basic Additive Synthesis
 
-New: generate strings for full sustain (10s), mix into 2-cycle buffer without wrapping, cross-fade second cycle over first to create seamless single-cycle loop. String tails from cycle 1 naturally extend into cycle 2, so the loop point always has continuous drone.
+**Approach:** Sum of 20 sinusoids with per-harmonic amplitude, decay rate, and AM rate. Per-string parameters. Random phases. Pitch drift per harmonic. Noise transient in attack. Global jawari swell envelope. Pluck suppression ramp.
+
+**Parameters:**
+- HARMONICS: 20 entries, (n, amplitude, decay_rate, am_rate)
+- Decay rates: 0.3–3.0 per second
+- AM depth: 0.15, AM rates: 0.3–1.6 Hz
+- Attack tau: 50ms
+- Pluck level: 0.4 (suppresses initial 60% of pluck, ramps over 150ms)
+- Jawari swell: global gamma envelope (t² × exp(-2t/peak))
+
+**Result:** *"Horrible. Much worse compared to where we got to in v1. Sounds very unnatural. More than strings being plucked and resonating, it sounds like some metal strip vibrating. Very lo-fi."*
+
+**Diagnosis:** Pure sinusoids with smooth envelopes sound organ-like. AM at 0.3–1.6 Hz creates pulsating/throbbing. Random phases create diffuse onset (no pluck transient). Pluck suppression kills the attack.
+
+### Experiment 2: Slower Decay Rates
+
+**Change:** Decay rates reduced from 0.3–3.0 to 0.10–0.55 per second so harmonics sustain 5–10× longer.
+
+**Result:** *"Still super synthetic. Very drony. Very lo-fi. No swells (almost zero drone on the 4th string)."*
+
+**Diagnosis:** Slower decay helped sustain but didn't fix the fundamental synthetic character. AM still causing helicopter drone. No spectral evolution.
+
+### Experiment 3: Per-Harmonic Jawari Growth + Inharmonicity + No AM
+
+**Changes:**
+- Restructured HARMONICS to (n, pluck_amp, jawari_amp, jawari_peak_s, decay_rate)
+- Jawari harmonics (H4, H7, H9-H11) GROW after pluck via gaussian rise
+- Added inharmonicity B=0.00004 (partials slightly sharp → metallic)
+- Removed all AM (eliminated helicopter drone)
+- Faster attack tau: 8ms
+- Stronger noise transient: 0.08 level, 60ms
+
+**Result:** *"Not at all an improvement. Now it sounds completely droney. The pluck sound initial attack is completely lost."*
+
+**Diagnosis:** Jawari amplitudes too dominant vs pluck amplitudes (H7 jawari_amp=0.75 vs pluck_amp=0.15). Sound became dominated by growing jawari harmonics. Pluck suppression (pluck_shape at 0.5) still active, cutting initial attack by 50%.
+
+### Experiment 4: Coherent Phases + Reduced Jawari + No Pluck Suppression
+
+**Changes:**
+- Phase = 0 for all harmonics (coherent pluck excitation)
+- Boosted pluck_amp, reduced jawari_amp (H7: pluck 0.50, jawari 0.25)
+- Removed pluck_shape entirely
+- H1 pluck_amp = 1.00 (dominant at pluck)
+
+**Result:** *"No. Still too monotonously drone-y. Not how real strings would vibrate and interact. Too synthetic. Plucks still not as clear."*
+
+**Diagnosis:** Additive synthesis with smooth exponential envelopes is fundamentally organ-like regardless of phase coherence. Independent sinusoids don't interact — no energy transfer, no mode coupling, no physical string behavior.
+
+### Experiment 5: Resonator Bank + Body IR (new engine)
+
+**Major rewrite.** Replaced additive synthesis with physically-motivated resonator bank:
+- Each harmonic is a 2nd-order IIR biquad filter
+- Excitation: single-sample impulse + 12ms noise burst
+- Body IR convolution: synthetic tanpura gourd response (6 modes at 180–2800 Hz)
+- HARMONICS restructured to (n, gain, T60_seconds) where T60 = time to -60dB
+- T60 values: 7.0s (H1) down to 0.25s (H26)
+- Extended harmonics to H26 for HF shimmer
+- Simplified STRING_PARAMS (removed AM, swell, pluck_level)
+
+**Result:** *"The vibrations/resonance seem to have all but vanished. Can hear just the plucks mostly."*
+
+**Diagnosis:** Single-sample impulse creates extremely sharp transient peak. Peak normalization then crushes the sustain to near-silence. The pluck-to-sustain ratio is too extreme with impulse excitation.
+
+### Experiment 6: Shaped Excitation + Soft Compression
+
+**Changes:**
+- Excitation changed from single impulse to 20ms exponential burst (τ=3ms) — ~66× more energy
+- Added tanh soft compression (knee=0.4) to reduce pluck-to-sustain ratio
+
+**Result:** *"This one sounds like a distorted guitar now."*
+
+**Diagnosis:** tanh compression IS a distortion/waveshaping effect — creates intermodulation products. Resonator bank + body IR already sounds guitar-like (because KS and resonator banks ARE guitar string models). Compression made it worse.
+
+### Experiment 7: Remove Compression + RMS Normalization
+
+**Changes:**
+- Removed tanh compression entirely
+- Reduced body_mix from 0.35 to 0.20 (less body coloring)
+- Changed mono normalization from peak-based to RMS-based (target RMS=0.18)
+- Hard clip safety at ±0.95
+
+**Result:** *"Step back to the one where plucks were the only sound pretty much. Little bit of sustain but that's it. Not at all like a real tanpura's jawari, no metallic buzzing, no swells & drops."*
+
+**Diagnosis:** RMS normalization helped sustain survive but the resonator bank fundamentally produces guitar-like pluck-and-ring, not tanpura-like jawari. The biquad resonators decay monotonically — there's no mechanism for harmonics to grow, swell, or trade energy. The body IR adds acoustic coloring but doesn't create jawari character. The core issue: resonator bank = plucked string without a bridge. Jawari requires nonlinear interaction (string buzzing against bridge) which neither additive nor linear resonator models can produce.
+
+### Summary of What Doesn't Work
+
+| Approach | Problem |
+|----------|---------|
+| Per-harmonic AM (0.15 depth, 0.3–1.6 Hz) | Helicopter drone |
+| Pluck suppression (pluck_shape ramp) | Kills pluck transient |
+| Random phases per harmonic | Diffuse organ-like onset, no pluck character |
+| High jawari_amp vs low pluck_amp | Drowns pluck, creates monotonous drone |
+| Single-sample impulse excitation | Extreme transient, sustain crushed by normalization |
+| Peak normalization after sharp transients | Crushes sustain to silence |
+| tanh compression | Distorted guitar sound |
+| Large body_mix (0.35+) | Adds wrong character (guitar-like) |
+| Fast decay rates (0.3–3.0/s) | Harmonics die too quickly, no sustain |
+| Slow decay rates (0.08–0.55/s) with uniform amplitudes | Monotonous drone |
+| Additive synthesis in general | Fundamentally organ-like; smooth envelopes ≠ physical string |
+
+### Key Unsolved Problem
+
+Every approach sounds either synthetic/organ-like (additive) or guitar-like (resonator bank). Neither captures the tanpura's unique character: a warm, sustained drone with metallic jawari buzz that sounds like a real acoustic instrument.
+
+**The missing piece is jawari itself.** All approaches so far use linear models (sinusoids, biquad resonators) which can only decay monotonically. Real jawari requires nonlinear string-bridge interaction:
+- String buzzes against the curved bridge surface
+- This transfers energy between harmonics (H4↔H7 trading)
+- Creates non-monotonic amplitude swells (harmonics GROW then decay)
+- Produces the characteristic metallic buzzing texture
+
+Linear synthesis cannot produce this. The waveguide DID model it (bridge reflection), but the delay-line artifacts made it sound lo-fi. The challenge: find a way to get jawari's nonlinear character without the waveguide's lo-fi artifacts.
+
+Tanpura Droid almost certainly uses high-quality recorded samples, not synthesis.
