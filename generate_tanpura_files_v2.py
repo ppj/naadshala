@@ -697,3 +697,40 @@ def synthesize_tanpura(tonic_hz, interval, sr):
     stereo *= 0.92
 
     return stereo
+
+
+def extract_loopable_cycle(stereo, cycle_dur, sr, cycle_idx=3, xfade_s=0.15):
+    """Extract one loopable cycle from a multi-cycle stereo render.
+
+    Args:
+        stereo:     Full render, shape (N, 2), float64.
+        cycle_dur:  Duration of one cycle in seconds (3.6 s for standard tanpura).
+        sr:         Sample rate.
+        cycle_idx:  0-based index of the cycle to extract (default 3 = cycle 4 of 5).
+        xfade_s:    Crossfade length in seconds (default 0.15 = 150 ms).
+
+    Returns:
+        Stereo array of shape (cycle_size, 2).
+
+    The crossfade blends the *beginning* of the extracted cycle with the
+    corresponding tail from the *next* cycle.  At t=0 the output is 100%
+    next-cycle continuation, fading to 100% extracted cycle by t=xfade_s.
+    This means the hard position-reset loop (Android AudioTrack) transitions
+    smoothly: end-of-file → beginning-of-file plays through the crossfade region.
+    """
+    cycle_size = int(cycle_dur * sr)
+    xfade_len  = int(xfade_s * sr)
+
+    start = cycle_idx * cycle_size
+    end   = start + cycle_size
+
+    cycle = stereo[start:end].copy()
+
+    tail_start = end
+    tail_end   = tail_start + xfade_len
+    tail = stereo[tail_start:tail_end].copy()
+
+    fade_in = np.linspace(0.0, 1.0, xfade_len).reshape(-1, 1)
+    cycle[:xfade_len] = cycle[:xfade_len] * fade_in + tail * (1.0 - fade_in)
+
+    return cycle
