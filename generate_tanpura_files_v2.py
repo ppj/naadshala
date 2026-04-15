@@ -734,3 +734,87 @@ def extract_loopable_cycle(stereo, cycle_dur, sr, cycle_idx=3, xfade_s=0.15):
     cycle[:xfade_len] = cycle[:xfade_len] * fade_in + tail * (1.0 - fade_in)
 
     return cycle
+
+
+# ============================================================================
+# EXPORT
+# ============================================================================
+
+def export_ogg(stereo, sr, filepath):
+    """Export stereo float64 array to OGG Vorbis via ffmpeg."""
+    fd, wav_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    subtype = "PCM_24" if BIT_DEPTH == 24 else "PCM_16"
+    sf.write(wav_path, stereo, sr, subtype=subtype)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", wav_path,
+                "-codec:a", "libvorbis",
+                "-qscale:a", str(OGG_QUALITY),
+                filepath,
+            ],
+            check=True,
+        )
+    finally:
+        os.remove(wav_path)
+    size_kb = os.path.getsize(filepath) / 1024
+    print(f"    OGG → {os.path.basename(filepath)}  ({size_kb:.0f} KB)")
+
+
+def export_caf(stereo, sr, filepath):
+    """Export stereo float64 array to CAF/ALAC via macOS afconvert."""
+    fd, wav_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    sf.write(wav_path, stereo, sr, subtype="PCM_16")
+    try:
+        subprocess.run(
+            ["afconvert", wav_path, filepath, "-f", "caff", "-d", "alac"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    finally:
+        os.remove(wav_path)
+    size_kb = os.path.getsize(filepath) / 1024
+    print(f"    CAF → {os.path.basename(filepath)}  ({size_kb:.0f} KB)")
+
+
+# ============================================================================
+# MAIN
+# ============================================================================
+
+def main():
+    os.makedirs(OGG_OUTPUT_DIR, exist_ok=True)
+    os.makedirs(CAF_OUTPUT_DIR, exist_ok=True)
+
+    cycle_dur   = 2 * LONG_GAP + 2 * SHORT_GAP   # 3.6 s
+    total_files = len(SA_FREQUENCIES) * len(STRING1_NOTES)
+    t0 = time.time()
+
+    print(f"Generating {total_files} tanpura files (OGG + CAF) at {SAMPLE_RATE} Hz ...")
+    print(f"  OGG → {OGG_OUTPUT_DIR}")
+    print(f"  CAF → {CAF_OUTPUT_DIR}")
+    print()
+
+    count = 0
+    for sa_name, sa_freq in SA_FREQUENCIES.items():
+        for interval in STRING1_NOTES:
+            count += 1
+            stem = f"{sa_name}_{interval}"
+            print(f"[{count}/{total_files}] {stem}  (Sa={sa_freq:.2f} Hz, str1={interval})")
+
+            stereo = synthesize_tanpura(sa_freq, interval, SAMPLE_RATE)
+            cycle  = extract_loopable_cycle(stereo, cycle_dur, SAMPLE_RATE, cycle_idx=3)
+
+            export_ogg(cycle, SAMPLE_RATE, os.path.join(OGG_OUTPUT_DIR, f"{stem}.ogg"))
+            export_caf(cycle, SAMPLE_RATE, os.path.join(CAF_OUTPUT_DIR, f"{stem}.caf"))
+            print()
+
+    elapsed = time.time() - t0
+    print(f"Done — {total_files} × 2 formats in {elapsed:.0f} s")
+
+
+if __name__ == "__main__":
+    main()
