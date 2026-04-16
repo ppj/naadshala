@@ -103,7 +103,7 @@ STRING_PARAMS = {
         "level":              0.72,
         "pan":                0.35,
         "jawari_buzz":        0.05,
-        "ks_level":           2.0,
+        "ks_level":           1.8,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
@@ -120,7 +120,7 @@ STRING_PARAMS = {
         "level":              0.90,
         "pan":                0.48,
         "jawari_buzz":        0.07,
-        "ks_level":           2.0,
+        "ks_level":           1.3,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":    0.68,
@@ -136,7 +136,7 @@ STRING_PARAMS = {
         "level":              0.87,
         "pan":                0.55,
         "jawari_buzz":        0.06,
-        "ks_level":           2.0,
+        "ks_level":           1.3,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -153,7 +153,7 @@ STRING_PARAMS = {
         "level":              0.70,
         "pan":                0.62,
         "jawari_buzz":        0.01,
-        "ks_level":           2.5,
+        "ks_level":           0.9,
     },
 }
 
@@ -430,12 +430,12 @@ def _synthesize_pluck_modal(frequency, sr, params):
         env   = np.exp(-t / dec_tau)
         signal += amp * env * np.sin(2 * np.pi * f_h * t + phase)
 
-    # Gentle low-shelf cut to reduce bass thump on the pluck without
-    # removing the fundamental character entirely.
-    shelf_freq = min(300.0 / (sr / 2), 0.99)
+    # High-pass blend to reduce bass thump on the pluck.
+    # Cutoff at 500 Hz, 25/75 blend gives ~-12 dB below the shelf.
+    shelf_freq = min(500.0 / (sr / 2), 0.99)
     b_shelf, a_shelf = sig.butter(2, shelf_freq, btype='high')
     signal_hi = sig.lfilter(b_shelf, a_shelf, signal)
-    signal = signal * 0.5 + signal_hi * 0.5   # blend: -6 dB below shelf_freq
+    signal = signal * 0.25 + signal_hi * 0.75
 
     # Peak-normalise so ks_level in the mix is a predictable ratio of the
     # pluck's peak amplitude to sustain_rms.  RMS-normalisation inflates the
@@ -535,9 +535,9 @@ def _apply_jawari_waveshaping(mono, sr, buzz_strength):
         shimmer = sig.lfilter(b_sh, a_sh, shimmer)
         shimmer_rms = np.sqrt(np.mean(shimmer ** 2))
         if shimmer_rms > 0 and mono_rms > 0:
-            # Fixed level independent of buzz_strength — shimmer should always
-            # be present regardless of how low the main buzz is tuned.
-            shimmer *= (mono_rms * 0.10) / shimmer_rms
+            # Scale shimmer with buzz_strength so strings with low buzz
+            # (e.g. S4) don't get a disproportionately harsh shimmer layer.
+            shimmer *= (mono_rms * buzz_strength * 2.0) / shimmer_rms
     else:
         shimmer = np.zeros_like(mono)
 
@@ -691,10 +691,10 @@ def synthesize_tanpura(tonic_hz, interval, sr):
     stereo = np.column_stack([mix_L, mix_R])
     stereo = _spectral_match_eq(stereo, sr, tonic_hz)
 
-    peak = np.percentile(np.abs(stereo.flatten()), 99.9)
-    if peak > 0:
-        stereo /= peak
-    stereo *= 0.92
+    rms = np.sqrt(np.mean(stereo ** 2))
+    if rms > 0:
+        stereo *= 0.15 / rms  # target ~−16.5 dBFS RMS
+    stereo = np.clip(stereo, -1.0, 1.0)
 
     return stereo
 
