@@ -38,7 +38,7 @@ OGG_QUALITY = 10
 SHORT_GAP    = 0.6   # seconds
 LONG_GAP     = 1.2   # seconds
 NUM_CYCLES   = 5
-SUSTAIN_TAIL = 6.0
+SUSTAIN_TAIL = 3.0
 
 # ---------------------------------------------------------------------------
 # Synthesis parameters  (must match tanpura_synth.py)
@@ -103,7 +103,7 @@ STRING_PARAMS = {
         "level":              0.72,
         "pan":                0.35,
         "jawari_buzz":        0.05,
-        "ks_level":           1.8,
+        "ks_level":           1.4,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
@@ -111,7 +111,7 @@ STRING_PARAMS = {
         "jawari_shift_db":    0.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            3.0,
+        "sustain":            5.0,
         "swell_amount":       0.60,
         "swell_center_s":     0.20,
         "brightness":         0.55,
@@ -120,14 +120,14 @@ STRING_PARAMS = {
         "level":              0.90,
         "pan":                0.48,
         "jawari_buzz":        0.07,
-        "ks_level":           1.3,
+        "ks_level":           1.7,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":    0.68,
         "jawari_shift_db":    -1.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            3.0,
+        "sustain":            5.0,
         "swell_amount":       0.58,
         "swell_center_s":     0.22,
         "brightness":         0.50,
@@ -136,7 +136,7 @@ STRING_PARAMS = {
         "level":              0.87,
         "pan":                0.55,
         "jawari_buzz":        0.06,
-        "ks_level":           1.3,
+        "ks_level":           1.7,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -144,7 +144,7 @@ STRING_PARAMS = {
         "jawari_shift_db":    -2.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            2.0,
+        "sustain":            3.0,
         "swell_amount":       0.65,
         "swell_center_s":     0.30,
         "brightness":         0.35,
@@ -153,7 +153,7 @@ STRING_PARAMS = {
         "level":              0.70,
         "pan":                0.62,
         "jawari_buzz":        0.01,
-        "ks_level":           0.9,
+        "ks_level":           0.8,
     },
 }
 
