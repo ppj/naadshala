@@ -95,7 +95,7 @@ STRING_PARAMS = {
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
         "sustain":            4.0,
-        "swell_amount":       0.60,
+        "swell_amount":       0.82,
         "swell_center_s":     0.25,
         "brightness":         0.40,
         "attack_ms":          2.0,
@@ -103,7 +103,8 @@ STRING_PARAMS = {
         "level":              0.72,
         "pan":                0.35,
         "jawari_buzz":        0.05,
-        "ks_level":           1.4,
+        "buzz_gate_s":        1.50,    # buzz/shimmer fade to ~5% by this time
+        "ks_level":           0.9,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
@@ -120,7 +121,8 @@ STRING_PARAMS = {
         "level":              0.90,
         "pan":                0.48,
         "jawari_buzz":        0.07,
-        "ks_level":           1.8,
+        "buzz_gate_s":        0.35,
+        "ks_level":           1.2,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":    0.68,
@@ -136,7 +138,8 @@ STRING_PARAMS = {
         "level":              0.87,
         "pan":                0.55,
         "jawari_buzz":        0.06,
-        "ks_level":           1.8,
+        "buzz_gate_s":        0.35,
+        "ks_level":           1.2,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -145,7 +148,7 @@ STRING_PARAMS = {
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
         "sustain":            4.0,
-        "swell_amount":       0.65,
+        "swell_amount":       0.78,
         "swell_center_s":     0.30,
         "brightness":         0.35,
         "attack_ms":          2.5,
@@ -153,7 +156,8 @@ STRING_PARAMS = {
         "level":              0.70,
         "pan":                0.62,
         "jawari_buzz":        0.01,
-        "ks_level":           0.8,
+        "buzz_gate_s":        0.35,
+        "ks_level":           0.6,
     },
 }
 
@@ -277,7 +281,7 @@ def harmonic_envelope(t, h, params):
     attack = 1.0 - np.exp(-t / attack_tau)
 
     # 2. Swell  (jawari bloom — mid-upper harmonics swell the most)
-    h_swell_factor = 1.0 + 0.4 * np.exp(-0.5 * ((h - 10) / 5) ** 2)
+    h_swell_factor = 1.0 + 0.7 * np.exp(-0.5 * ((h - 10) / 5) ** 2)
     swell_t   = swell_center * (1.0 + 0.04 * h)   # later for higher h
     swell_w   = swell_t * 0.50
     swell     = 1.0 + swell_amount * h_swell_factor * np.exp(
@@ -474,7 +478,7 @@ def _body_resonance(audio, sr):
     return audio
 
 
-def _apply_jawari_waveshaping(mono, sr, buzz_strength):
+def _apply_jawari_waveshaping(mono, sr, buzz_strength, gate_s=None):
     """
     Derive metallic jawari buzz from the string signal via waveshaping.
 
@@ -482,14 +486,9 @@ def _apply_jawari_waveshaping(mono, sr, buzz_strength):
     only on the downswing toward the bridge surface — causing soft clipping
     that generates inharmonic distortion products with a metallic timbre.
 
-    Extracts the distortion component (waveshaped − original), band-passes
-    it to the metallic sizzle range (800–8000 Hz), and mixes back at a
-    level proportional to buzz_strength relative to the carrier RMS.
-
-    Because the buzz is derived from the string signal it naturally:
-      • follows the string's amplitude envelope
-      • is louder during the swell and quieter as the string decays
-      • disappears in the silence between plucks
+    gate_s: if set, the buzz+shimmer fade out exponentially with tau=gate_s/3,
+    reaching ~5% by gate_s seconds. This confines the metallic character to the
+    attack, letting the sustain ring clean — matching how real jawari settles.
     """
     if buzz_strength <= 0:
         return mono
@@ -540,6 +539,13 @@ def _apply_jawari_waveshaping(mono, sr, buzz_strength):
             shimmer *= (mono_rms * buzz_strength * 2.0) / shimmer_rms
     else:
         shimmer = np.zeros_like(mono)
+
+    # Time-gate: exponential decay so buzz/shimmer fade out after the attack
+    if gate_s is not None and gate_s > 0:
+        t = np.arange(len(mono)) / sr
+        gate = np.exp(-t / (gate_s / 3.0))
+        buzz    *= gate
+        shimmer *= gate
 
     return mono + buzz + shimmer
 
@@ -656,7 +662,8 @@ def synthesize_tanpura(tonic_hz, interval, sr):
         freq     = freqs[snum]
 
         sustain  = synthesize_string(freq, ring_dur, sr, sp)
-        sustain  = _apply_jawari_waveshaping(sustain, sr, sp.get("jawari_buzz", 0.0))
+        sustain  = _apply_jawari_waveshaping(sustain, sr, sp.get("jawari_buzz", 0.0),
+                                              gate_s=sp.get("buzz_gate_s"))
         sustain *= sp["level"]
 
         ks       = _synthesize_pluck_modal(freq, sr, sp)
@@ -693,8 +700,10 @@ def synthesize_tanpura(tonic_hz, interval, sr):
 
     rms = np.sqrt(np.mean(stereo ** 2))
     if rms > 0:
-        stereo *= 0.15 / rms  # target ~−16.5 dBFS RMS
-    stereo = np.clip(stereo, -1.0, 1.0)
+        stereo *= 0.22 / rms  # target ~-13.1 dBFS RMS
+    peak = np.max(np.abs(stereo))
+    if peak > 0.95:
+        stereo *= 0.95 / peak
 
     return stereo
 
