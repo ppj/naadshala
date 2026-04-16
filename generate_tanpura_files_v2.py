@@ -495,9 +495,7 @@ def _apply_jawari_waveshaping(mono, sr, buzz_strength, gate_s=None):
 
     # Asymmetric soft-clipper — positive half (toward bridge) is clipped,
     # negative half (away from bridge) passes with mild attenuation.
-    # Lower drive (1.3) gives gentler, smoother clipping with softer harmonic
-    # content compared to the harder 2.0 setting.
-    drive = 0.8
+    drive = 2.0
     shaped = np.where(
         mono > 0,
         np.tanh(mono * drive) / np.tanh(drive),
