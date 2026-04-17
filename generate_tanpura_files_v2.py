@@ -102,9 +102,9 @@ STRING_PARAMS = {
         "transient_db":       -25.0,
         "level":              0.72,
         "pan":                0.35,
-        "jawari_buzz":        0.05,
+        "jawari_buzz":        0.10,
         "buzz_gate_s":        1.50,    # buzz/shimmer fade to ~5% by this time
-        "ks_level":           0.9,
+        "ks_level":           0.70,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
@@ -120,9 +120,9 @@ STRING_PARAMS = {
         "transient_db":       -23.0,
         "level":              0.90,
         "pan":                0.48,
-        "jawari_buzz":        0.07,
-        "buzz_gate_s":        0.35,
-        "ks_level":           1.2,
+        "jawari_buzz":        0.14,
+        "buzz_gate_s":        1.50,
+        "ks_level":           0.8,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":    0.68,
@@ -137,9 +137,9 @@ STRING_PARAMS = {
         "transient_db":       -24.0,
         "level":              0.87,
         "pan":                0.55,
-        "jawari_buzz":        0.06,
-        "buzz_gate_s":        0.35,
-        "ks_level":           1.2,
+        "jawari_buzz":        0.12,
+        "buzz_gate_s":        1.50,
+        "ks_level":           0.8,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -157,7 +157,7 @@ STRING_PARAMS = {
         "pan":                0.62,
         "jawari_buzz":        0.01,
         "buzz_gate_s":        0.35,
-        "ks_level":           0.6,
+        "ks_level":           0.55,
     },
 }
 
@@ -660,7 +660,12 @@ def synthesize_tanpura(tonic_hz, interval, sr):
         freq     = freqs[snum]
 
         sustain  = synthesize_string(freq, ring_dur, sr, sp)
-        sustain  = _apply_jawari_waveshaping(sustain, sr, sp.get("jawari_buzz", 0.0),
+        # Scale jawari buzz with string frequency: lower strings get less buzz
+        # to prevent harshness. Full buzz at/above ~E3 (165 Hz), cubic rolloff below.
+        # G#2→25%, A#2→36%, C#3→60%, E3→100%
+        buzz_freq_scale = np.clip((freq / 165.0) ** 3, 0.1, 1.0)
+        buzz_strength   = sp.get("jawari_buzz", 0.0) * buzz_freq_scale
+        sustain  = _apply_jawari_waveshaping(sustain, sr, buzz_strength,
                                               gate_s=sp.get("buzz_gate_s"))
         sustain *= sp["level"]
 
