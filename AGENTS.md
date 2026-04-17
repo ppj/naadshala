@@ -15,7 +15,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Generate tanpura files (45 OGG → output/tanpura/, 45 CAF → output/tanpura_caf/)
-python generate_tanpura_files.py
+python generate_tanpura_files_v2.py
 
 # Generate pluck files (180 OGG files → output/plucks/)
 python generate_reference_plucks.py
@@ -28,12 +28,15 @@ python generate_swarmandal_plucks.py
 
 **Three independent audio generators:**
 
-1. **generate_tanpura_files.py** - Additive synthesis for tanpura drones
+1. **generate_tanpura_files_v2.py** - Additive jawari synthesis for tanpura drones (primary generator)
    - Creates 45 files per format: 15 Sa frequencies × 3 String 1 options (P, m, N)
-   - Dual output: OGG Vorbis → `output/tanpura/` (Android); CAF/AAC → `output/tanpura_caf/` (iOS)
+   - Dual output: OGG Vorbis → `output/tanpura/` (Android); CAF/ALAC → `output/tanpura_caf/` (iOS)
    - CAF conversion uses macOS `afconvert` (pre-installed on Mac, not available on Linux)
-   - Uses harmonic structure extracted from real Calcutta-standard tanpura
-   - Stereo output with Haas effect, ~10 seconds per file
+   - Harmonic amplitudes derived from real Calcutta-standard tanpura spectral template
+   - Jawari buzz via asymmetric waveshaping + modal pluck transient per string
+   - Renders 5 cycles, extracts cycle 4, applies 150ms crossfade for seamless looping
+   - Stereo output at 48 kHz, ~3.6 seconds per file
+   - **generate_tanpura_files.py** is the previous waveguide-based implementation (kept for reference)
 
 2. **generate_reference_plucks.py** - Karplus-Strong algorithm for guitar-like plucks
    - Creates 180 files: 15 Sa frequencies × 12 swars
@@ -45,7 +48,7 @@ python generate_swarmandal_plucks.py
    - Mono output, ~3 seconds per file with 500ms fade out
 
 **Audio conventions:**
-- Sample rate: 44.1 kHz
+- Sample rate: 44.1 kHz (plucks/swarmandal); 48 kHz (tanpura v2)
 - Format: OGG Vorbis
 - Tuning: Just Intonation ratios (not equal temperament)
 - Sa range: G#2 (103.83 Hz) to A#3 (233.08 Hz)
