@@ -44,7 +44,6 @@ SUSTAIN_TAIL = 3.0
 # Synthesis parameters  (must match tanpura_synth.py)
 # ---------------------------------------------------------------------------
 SA_DETUNE_CENTS  = 2.0
-SYMPATHETIC_GAIN = 0.04
 MAX_HARMONICS    = 80
 FREQ_JITTER      = 0.0003
 
@@ -97,7 +96,6 @@ STRING_PARAMS = {
         "sustain":            4.0,
         "swell_amount":       0.82,
         "swell_center_s":     0.25,
-        "brightness":         0.40,
         "attack_ms":          2.0,
         "transient_db":       -25.0,
         "level":              0.72,
@@ -115,7 +113,6 @@ STRING_PARAMS = {
         "sustain":            2.5,
         "swell_amount":       0.60,
         "swell_center_s":     0.20,
-        "brightness":         0.55,
         "attack_ms":          1.5,
         "transient_db":       -23.0,
         "level":              0.90,
@@ -132,7 +129,6 @@ STRING_PARAMS = {
         "sustain":            2.0,
         "swell_amount":       0.58,
         "swell_center_s":     0.22,
-        "brightness":         0.50,
         "attack_ms":          1.5,
         "transient_db":       -24.0,
         "level":              0.87,
@@ -150,7 +146,6 @@ STRING_PARAMS = {
         "sustain":            4.0,
         "swell_amount":       0.78,
         "swell_center_s":     0.30,
-        "brightness":         0.35,
         "attack_ms":          2.5,
         "transient_db":       -22.0,
         "level":              0.70,
@@ -308,7 +303,6 @@ def synthesize_string(frequency, duration_s, sr, params):
     n_samples  = int(duration_s * sr)
     t          = np.arange(n_samples, dtype=np.float64) / sr
     signal     = np.zeros(n_samples, dtype=np.float64)
-    brightness = params["brightness"]
     attack_ms  = params["attack_ms"]
 
     max_h = min(MAX_HARMONICS, int(sr * 0.45 / frequency))
@@ -380,8 +374,6 @@ def _synthesize_pluck_modal(frequency, sr, params):
     pluck_dur_s = 0.22
     n_samples   = int(pluck_dur_s * sr)
     t           = np.arange(n_samples) / sr
-    brightness  = params["brightness"]
-
     rng    = np.random.default_rng()
     signal = np.zeros(n_samples)
 
