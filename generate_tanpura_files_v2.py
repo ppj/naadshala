@@ -37,7 +37,7 @@ OGG_QUALITY = 10
 # ---------------------------------------------------------------------------
 SHORT_GAP    = 0.6   # seconds
 LONG_GAP     = 1.2   # seconds
-NUM_CYCLES   = 5
+NUM_CYCLES   = 6
 SUSTAIN_TAIL = 3.0
 
 # ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ STRING_PARAMS = {
         "jawari_shift_db":    0.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            4.0,
+        "sustain":            8.0,
         "swell_amount":       0.82,
         "swell_center_s":     0.25,
         "attack_ms":          2.0,
@@ -101,7 +101,7 @@ STRING_PARAMS = {
         "level":              0.72,
         "pan":                0.35,
         "jawari_buzz":        0.10,
-        "buzz_gate_s":        1.50,    # buzz/shimmer fade to ~5% by this time
+        "buzz_gate_s":        3.00,    # buzz/shimmer fade to ~5% by this time
         "ks_level":           0.70,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
@@ -110,7 +110,7 @@ STRING_PARAMS = {
         "jawari_shift_db":    0.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            2.5,
+        "sustain":            5.0,
         "swell_amount":       0.60,
         "swell_center_s":     0.20,
         "attack_ms":          1.5,
@@ -118,15 +118,15 @@ STRING_PARAMS = {
         "level":              0.90,
         "pan":                0.48,
         "jawari_buzz":        0.14,
-        "buzz_gate_s":        1.50,
-        "ks_level":           0.8,
+        "buzz_gate_s":        3.00,
+        "ks_level":           0.9,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":    0.68,
         "jawari_shift_db":    -1.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            2.0,
+        "sustain":            5.0,
         "swell_amount":       0.58,
         "swell_center_s":     0.22,
         "attack_ms":          1.5,
@@ -134,8 +134,8 @@ STRING_PARAMS = {
         "level":              0.87,
         "pan":                0.55,
         "jawari_buzz":        0.12,
-        "buzz_gate_s":        1.50,
-        "ks_level":           0.8,
+        "buzz_gate_s":        3.75,
+        "ks_level":           0.9,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -143,7 +143,7 @@ STRING_PARAMS = {
         "jawari_shift_db":    -2.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            4.0,
+        "sustain":            9.0,
         "swell_amount":       0.78,
         "swell_center_s":     0.30,
         "attack_ms":          2.5,
