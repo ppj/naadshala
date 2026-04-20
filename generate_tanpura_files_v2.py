@@ -46,6 +46,7 @@ SUSTAIN_TAIL = 3.0
 SA_DETUNE_CENTS  = 2.0
 MAX_HARMONICS    = 80
 FREQ_JITTER      = 0.0003
+JAWARI_REF_HZ    = 165.0   # Pa of A3 (highest tonic) — jawari_strength scales down below this
 
 # ---------------------------------------------------------------------------
 # Tonics: G#2 → A#3 (15 semitones)
@@ -394,8 +395,8 @@ def _synthesize_pluck_modal(frequency, sr, params):
     b_n, a_n = sig.butter(3, [lo, hi], btype='band')
     noise    = rng.standard_normal(n_samples)
     noise    = sig.lfilter(b_n, a_n, noise)
-    ds = params.get("pluck_decay_scale", 1.0)
-    noise_env = (1.0 - np.exp(-t / 0.003)) * np.exp(-t / (0.025 * ds))
+    decay_scale = params.get("pluck_decay_scale", 1.0)
+    noise_env = (1.0 - np.exp(-t / 0.003)) * np.exp(-t / (0.025 * decay_scale))
     signal   += 0.4 * noise_env * noise
 
     # 2. Body resonance modes — soft attack, exponential decay.
@@ -410,7 +411,7 @@ def _synthesize_pluck_modal(frequency, sr, params):
         if f_mode >= sr * 0.45:
             continue
         mode_phase = rng.uniform(0, 2 * np.pi)
-        env = (1.0 - np.exp(-t / atk_tau)) * np.exp(-t / (dec_tau * ds))
+        env = (1.0 - np.exp(-t / atk_tau)) * np.exp(-t / (dec_tau * decay_scale))
         signal += amp * env * np.sin(2 * np.pi * f_mode * t + mode_phase)
 
     # 3. Metallic string harmonics — bright upper partials present only
@@ -652,11 +653,6 @@ def synthesize_tanpura(tonic_hz, interval, sr):
         (4, LONG_GAP + 2 * SHORT_GAP),
     ]
 
-    # Reference frequency for jawari_strength scaling (Pa of A3, highest tonic).
-    # S1 and S4 get less jawari at lower pitches — slower string movement means
-    # less aggressive bridge contact, so the spectral peaks are less prominent.
-    _JAWARI_REF_HZ = 165.0
-
     rendered = {}
     for snum in (1, 2, 3, 4):
         sp       = dict(STRING_PARAMS[snum])   # copy — we may mutate jawari_strength
@@ -664,7 +660,8 @@ def synthesize_tanpura(tonic_hz, interval, sr):
         freq     = freqs[snum]
 
         if snum in (1, 4):
-            jaw_scale = np.clip((freq / _JAWARI_REF_HZ) ** 0.5, 0.4, 1.0)
+            # Lower pitches get softer jawari peaks — less bridge contact at lower tension.
+            jaw_scale = np.clip((freq / JAWARI_REF_HZ) ** 0.5, 0.4, 1.0)
             sp["jawari_strength"] = sp["jawari_strength"] * jaw_scale
 
         sustain  = synthesize_string(freq, ring_dur, sr, sp)
