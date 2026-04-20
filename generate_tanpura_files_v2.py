@@ -94,11 +94,11 @@ STRING_PARAMS = {
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
         "sustain":            5.0,
-        "swell_amount":       0.82,
+        "swell_amount":       0.72,
         "swell_center_s":     0.25,
         "attack_ms":          2.0,
         "transient_db":       -25.0,
-        "level":              0.72,
+        "level":              0.88,
         "pan":                0.35,
         "jawari_buzz":        0.10,
         "buzz_gate_s":        1.90,    # buzz/shimmer fade to ~5% by this time
@@ -111,15 +111,15 @@ STRING_PARAMS = {
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
         "sustain":            3.0,
-        "swell_amount":       0.60,
-        "swell_center_s":     0.20,
+        "swell_amount":       0.52,
+        "swell_center_s":     0.35,
         "attack_ms":          1.5,
         "transient_db":       -23.0,
-        "level":              0.90,
+        "level":              0.65,
         "pan":                0.48,
         "jawari_buzz":        0.14,
         "buzz_gate_s":        1.50,
-        "ks_level":           0.8,
+        "ks_level":           0.4,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":    0.68,
@@ -127,15 +127,15 @@ STRING_PARAMS = {
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
         "sustain":            2.5,
-        "swell_amount":       0.58,
-        "swell_center_s":     0.22,
+        "swell_amount":       0.50,
+        "swell_center_s":     0.35,
         "attack_ms":          1.5,
         "transient_db":       -24.0,
         "level":              0.87,
         "pan":                0.55,
         "jawari_buzz":        0.12,
         "buzz_gate_s":        1.50,
-        "ks_level":           0.8,
+        "ks_level":           0.4,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -144,11 +144,11 @@ STRING_PARAMS = {
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
         "sustain":            5.0,
-        "swell_amount":       0.78,
+        "swell_amount":       0.75,
         "swell_center_s":     0.30,
         "attack_ms":          2.5,
         "transient_db":       -22.0,
-        "level":              0.70,
+        "level":              0.85,
         "pan":                0.62,
         "jawari_buzz":        0.01,
         "buzz_gate_s":        0.35,
@@ -283,8 +283,8 @@ def harmonic_envelope(t, h, params):
         -0.5 * ((t - swell_t) / max(swell_w, 0.01)) ** 2
     )
 
-    # 3. Decay  (extremely slow — higher harmonics decay a bit faster)
-    decay_rate = (1.0 / sustain_s) * (1.0 + 0.015 * h)
+    # 3. Decay  (upper harmonics fade significantly faster than fundamental)
+    decay_rate = (1.0 / sustain_s) * (1.0 + 0.06 * h)
     decay = np.exp(-decay_rate * t)
 
     return attack * swell * decay
@@ -427,8 +427,10 @@ def _synthesize_pluck_modal(frequency, sr, params):
         signal += amp * env * np.sin(2 * np.pi * f_h * t + phase)
 
     # High-pass blend to reduce bass thump on the pluck.
-    # Cutoff at 500 Hz, 25/75 blend gives ~-12 dB below the shelf.
-    shelf_freq = min(500.0 / (sr / 2), 0.99)
+    # Cutoff at 3× fundamental so all strings lose a similar fraction of
+    # pluck energy regardless of pitch (fixed 500 Hz stripped low strings).
+    shelf_hz   = min(frequency * 3.0, 500.0)
+    shelf_freq = min(shelf_hz / (sr / 2), 0.99)
     b_shelf, a_shelf = sig.butter(2, shelf_freq, btype='high')
     signal_hi = sig.lfilter(b_shelf, a_shelf, signal)
     signal = signal * 0.25 + signal_hi * 0.75
@@ -645,13 +647,30 @@ def synthesize_tanpura(tonic_hz, interval, sr):
         (4, LONG_GAP + 2 * SHORT_GAP),
     ]
 
+    # Reference frequency for jawari_strength scaling (Pa of A3, highest tonic).
+    # S1 and S4 get less jawari at lower pitches — slower string movement means
+    # less aggressive bridge contact, so the spectral peaks are less prominent.
+    _JAWARI_REF_HZ = 165.0
+
     rendered = {}
     for snum in (1, 2, 3, 4):
-        sp       = STRING_PARAMS[snum]
+        sp       = dict(STRING_PARAMS[snum])   # copy — we may mutate jawari_strength
         ring_dur = sp["sustain"] + 3.0
         freq     = freqs[snum]
 
+        if snum in (1, 4):
+            jaw_scale = np.clip((freq / _JAWARI_REF_HZ) ** 0.5, 0.4, 1.0)
+            sp["jawari_strength"] = sp["jawari_strength"] * jaw_scale
+
         sustain  = synthesize_string(freq, ring_dur, sr, sp)
+
+        if snum == 4:
+            # Thick brass/bronze string has naturally weak high harmonics.
+            # Low-pass at ~8× fundamental preserves warmth without high-harmonic shred.
+            lp_hz  = min(freq * 8.0, 600.0)
+            b_lp, a_lp = sig.butter(2, lp_hz / (sr / 2), btype='low')
+            sustain = sig.lfilter(b_lp, a_lp, sustain)
+
         # Scale jawari buzz with string frequency: lower strings get less buzz
         # to prevent harshness. Full buzz at/above ~E3 (165 Hz), cubic rolloff below.
         # G#2→25%, A#2→36%, C#3→60%, E3→100%
