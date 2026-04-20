@@ -102,7 +102,8 @@ STRING_PARAMS = {
         "pan":                0.35,
         "jawari_buzz":        0.10,
         "buzz_gate_s":        1.90,    # buzz/shimmer fade to ~5% by this time
-        "ks_level":           0.70,
+        "ks_level":           0.40,
+        "pluck_decay_scale":  0.2,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
@@ -119,7 +120,8 @@ STRING_PARAMS = {
         "pan":                0.48,
         "jawari_buzz":        0.14,
         "buzz_gate_s":        1.50,
-        "ks_level":           0.4,
+        "ks_level":           0.25,
+        "pluck_decay_scale":  0.2,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":    0.68,
@@ -135,7 +137,8 @@ STRING_PARAMS = {
         "pan":                0.55,
         "jawari_buzz":        0.12,
         "buzz_gate_s":        1.50,
-        "ks_level":           0.4,
+        "ks_level":           0.25,
+        "pluck_decay_scale":  0.2,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -153,6 +156,7 @@ STRING_PARAMS = {
         "jawari_buzz":        0.01,
         "buzz_gate_s":        0.35,
         "ks_level":           0.55,
+        "pluck_decay_scale":  0.7,
     },
 }
 
@@ -390,7 +394,8 @@ def _synthesize_pluck_modal(frequency, sr, params):
     b_n, a_n = sig.butter(3, [lo, hi], btype='band')
     noise    = rng.standard_normal(n_samples)
     noise    = sig.lfilter(b_n, a_n, noise)
-    noise_env = (1.0 - np.exp(-t / 0.003)) * np.exp(-t / 0.025)
+    ds = params.get("pluck_decay_scale", 1.0)
+    noise_env = (1.0 - np.exp(-t / 0.003)) * np.exp(-t / (0.025 * ds))
     signal   += 0.4 * noise_env * noise
 
     # 2. Body resonance modes — soft attack, exponential decay.
@@ -405,7 +410,7 @@ def _synthesize_pluck_modal(frequency, sr, params):
         if f_mode >= sr * 0.45:
             continue
         mode_phase = rng.uniform(0, 2 * np.pi)
-        env = (1.0 - np.exp(-t / atk_tau)) * np.exp(-t / dec_tau)
+        env = (1.0 - np.exp(-t / atk_tau)) * np.exp(-t / (dec_tau * ds))
         signal += amp * env * np.sin(2 * np.pi * f_mode * t + mode_phase)
 
     # 3. Metallic string harmonics — bright upper partials present only
