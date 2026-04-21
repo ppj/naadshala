@@ -103,8 +103,9 @@ STRING_PARAMS = {
         "pan":                0.35,
         "jawari_buzz":        0.18,
         "buzz_gate_s":        2.25,    # buzz/shimmer fade to ~5% by this time
-        "ks_level":           0.40,
+        "ks_level":           0.50,
         "pluck_decay_scale":  0.2,
+        "pluck_attack_scale": 1.8,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
@@ -122,8 +123,9 @@ STRING_PARAMS = {
         "pan":                  0.48,
         "jawari_buzz":          0.14,
         "buzz_gate_s":          1.50,
-        "ks_level":             0.25,
+        "ks_level":             0.32,
         "pluck_decay_scale":    0.2,
+        "pluck_attack_scale":   1.8,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":      0.68,
@@ -140,8 +142,9 @@ STRING_PARAMS = {
         "pan":                  0.55,
         "jawari_buzz":          0.12,
         "buzz_gate_s":          1.50,
-        "ks_level":             0.25,
+        "ks_level":             0.32,
         "pluck_decay_scale":    0.2,
+        "pluck_attack_scale":   1.8,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -398,9 +401,10 @@ def _synthesize_pluck_modal(frequency, sr, params):
     b_n, a_n = sig.butter(3, [lo, hi], btype='band')
     noise    = rng.standard_normal(n_samples)
     noise    = sig.lfilter(b_n, a_n, noise)
-    decay_scale = params.get("pluck_decay_scale", 1.0)
+    decay_scale  = params.get("pluck_decay_scale", 1.0)
+    attack_scale = params.get("pluck_attack_scale", 1.0)
     noise_env = (1.0 - np.exp(-t / 0.003)) * np.exp(-t / (0.025 * decay_scale))
-    signal   += 0.4 * noise_env * noise
+    signal   += 0.4 * attack_scale * noise_env * noise
 
     # 2. Body resonance modes — soft attack, exponential decay.
     # (freq, attack_tau_s, decay_tau_s, relative_amplitude)
@@ -433,7 +437,7 @@ def _synthesize_pluck_modal(frequency, sr, params):
             break
         phase = rng.uniform(0, 2 * np.pi)
         env   = np.exp(-t / dec_tau)
-        signal += amp * env * np.sin(2 * np.pi * f_h * t + phase)
+        signal += amp * attack_scale * env * np.sin(2 * np.pi * f_h * t + phase)
 
     # High-pass blend to reduce bass thump on the pluck.
     # Cutoff at 3× fundamental so all strings lose a similar fraction of
