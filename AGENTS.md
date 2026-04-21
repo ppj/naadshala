@@ -34,7 +34,7 @@ python generate_swarmandal_plucks.py
    - CAF conversion uses macOS `afconvert` (pre-installed on Mac, not available on Linux)
    - Harmonic amplitudes derived from real Calcutta-standard tanpura spectral template
    - Jawari buzz via asymmetric waveshaping + modal pluck transient per string
-   - Renders 5 cycles, extracts cycle 4, applies 150ms crossfade for seamless looping
+   - Renders 6 cycles, extracts cycle 4, applies 150ms crossfade for seamless looping
    - Stereo output at 48 kHz, ~3.6 seconds per file
    - **generate_tanpura_files.py** is the previous waveguide-based implementation (kept for reference)
 

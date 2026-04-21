@@ -6,7 +6,7 @@ Generates 45 loopable single-cycle OGG + CAF files:
   15 tonics (G#2–A#3) × 3 string-1 intervals (Pa / Ma / Ni)
 
 Algorithm: ports the jawari additive engine from tanpura/tanpura_synth.py.
-Renders 5 cycles, extracts cycle 4 (has residual harmonics from cycles 1–3),
+Renders 6 cycles, extracts cycle 4 (has residual harmonics from cycles 1–3),
 applies 150 ms crossfade at the loop boundary for seamless AudioTrack looping.
 
 Output:
@@ -731,7 +731,7 @@ def extract_loopable_cycle(stereo, cycle_dur, sr, cycle_idx=3, xfade_s=0.15):
         stereo:     Full render, shape (N, 2), float64.
         cycle_dur:  Duration of one cycle in seconds (3.6 s for standard tanpura).
         sr:         Sample rate.
-        cycle_idx:  0-based index of the cycle to extract (default 3 = cycle 4 of 5).
+        cycle_idx:  0-based index of the cycle to extract (default 3 = cycle 4 of 6).
         xfade_s:    Crossfade length in seconds (default 0.15 = 150 ms).
 
     Returns:
