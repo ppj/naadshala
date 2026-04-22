@@ -10,7 +10,7 @@ Renders 6 cycles, extracts cycle 4 (has residual harmonics from cycles 1–3),
 applies 150 ms crossfade at the loop boundary for seamless AudioTrack looping.
 
 Output:
-  output/tanpura/{name}_{interval}.ogg   (Android)
+  output/tanpura_ogg/{name}_{interval}.ogg   (Android)
   output/tanpura_caf/{name}_{interval}.caf  (iOS, macOS only)
 
 Dependencies: numpy, scipy, soundfile, ffmpeg CLI, afconvert (macOS)
@@ -84,7 +84,7 @@ STRING1_RATIOS = {
 # Output directories
 # ---------------------------------------------------------------------------
 OUTPUT_DIR     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
-OGG_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "tanpura")
+OGG_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "tanpura_ogg")
 CAF_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "tanpura_caf")
 
 STRING_PARAMS = {

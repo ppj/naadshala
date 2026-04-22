@@ -13,7 +13,7 @@ Generate pre-recorded audio files for tanpura playback.
 Creates 45 files: 3 String 1 notes (P, m, N) × 15 Sa values (G#2 to A#3)
 
 Outputs two formats:
-  - OGG Vorbis → output/tanpura/          (Android / Swaramandal)
+  - OGG Vorbis → output/tanpura_ogg/       (Android / Swaramandal)
   - CAF/ALAC   → output/tanpura_caf/       (iOS / iSwarmandal, lossless)
     Requires macOS afconvert (pre-installed on all Macs, not available on Linux).
 
@@ -431,7 +431,7 @@ def main():
         print("Aborted.")
         return
 
-    ogg_dir = Path(__file__).parent / "output" / "tanpura"
+    ogg_dir = Path(__file__).parent / "output" / "tanpura_ogg"
     caf_dir = Path(__file__).parent / "output" / "tanpura_caf"
     ogg_dir.mkdir(parents=True, exist_ok=True)
     caf_dir.mkdir(parents=True, exist_ok=True)

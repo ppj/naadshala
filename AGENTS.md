@@ -14,7 +14,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Generate tanpura files (45 OGG → output/tanpura/, 45 CAF → output/tanpura_caf/)
+# Generate tanpura files (45 OGG → output/tanpura_ogg/, 45 CAF → output/tanpura_caf/)
 python generate_tanpura_files_v2.py
 
 # Generate pluck files (180 OGG files → output/plucks/)
@@ -30,7 +30,7 @@ python generate_swarmandal_plucks.py
 
 1. **generate_tanpura_files_v2.py** - Additive jawari synthesis for tanpura drones (primary generator)
    - Creates 45 files per format: 15 Sa frequencies × 3 String 1 options (P, m, N)
-   - Dual output: OGG Vorbis → `output/tanpura/` (Android); CAF/ALAC → `output/tanpura_caf/` (iOS)
+   - Dual output: OGG Vorbis → `output/tanpura_ogg/` (Android); CAF/ALAC → `output/tanpura_caf/` (iOS)
    - CAF conversion uses macOS `afconvert` (pre-installed on Mac, not available on Linux)
    - Harmonic amplitudes derived from real Calcutta-standard tanpura spectral template
    - Jawari buzz via asymmetric waveshaping + modal pluck transient per string

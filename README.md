@@ -10,7 +10,7 @@ Audio generation tools for Hindustani classical music applications.
 
 Generates loopable tanpura drone sounds using additive jawari synthesis.
 
-- **Output:** OGG Vorbis → `output/tanpura/` (Android); CAF/ALAC → `output/tanpura_caf/` (iOS)
+- **Output:** OGG Vorbis → `output/tanpura_ogg/` (Android); CAF/ALAC → `output/tanpura_caf/` (iOS)
 - **Coverage:** 15 Sa values (G#2 to A#3) × 3 String 1 options (P, m, N) = 45 files per format
 - **Harmonic structure:** Derived from real Calcutta-standard tanpura spectral template
 - **Key feature:** Per-string jawari buzz via asymmetric waveshaping + modal pluck transient
@@ -60,7 +60,7 @@ python generate_reference_plucks.py
 python generate_swarmandal_plucks.py
 ```
 
-Output files are written to `./output/tanpura/`, `./output/tanpura_caf/`, `./output/plucks/`, and `./output/swarmandal/` by default.
+Output files are written to `./output/tanpura_ogg/`, `./output/tanpura_caf/`, `./output/plucks/`, and `./output/swarmandal/` by default.
 
 ## Audio Configuration
 
