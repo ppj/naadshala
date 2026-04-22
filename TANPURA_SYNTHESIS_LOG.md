@@ -199,3 +199,25 @@ Every approach sounds either synthetic/organ-like (additive) or guitar-like (res
 Linear synthesis cannot produce this. The waveguide DID model it (bridge reflection), but the delay-line artifacts made it sound lo-fi. The challenge: find a way to get jawari's nonlinear character without the waveguide's lo-fi artifacts.
 
 Tanpura Droid almost certainly uses high-quality recorded samples, not synthesis.
+
+---
+
+## V2 Refinements (branch `tanpura-improvement-2`)
+
+Goal: make the drone sound fuller — the per-string sustain drop was too audible compared to Tanpura Droid.
+
+### What worked
+
+1. **Per-string `harmonic_decay_coeff`:** The global coefficient (0.06) was introduced earlier to fix electric-guitar shred on S1/S4. Lowering it globally reintroduced shred. Made it a per-string `STRING_PARAMS` key; S2/S3 use 0.04 (slower upper-harmonic rolloff = more warmth), S1/S4 keep 0.06.
+
+2. **Modest sustain increases:** S1/S4: 4.0 → 7.0s; S2: 2.5 → 4.5s; S3: 2.0 → 4.0s. Cycle 4 of 6 still valid at these sustains — residuals from cycles 1–3 contribute ~7–21% warmth without excessive accumulation.
+
+3. **S2 `swell_center_s` pulled earlier (0.35 → 0.20s):** H20 bloom was landing at t≈1.83s (right on the S3 pluck at 1.8s), creating an audible clash. Moving the center earlier shifts the bloom to t≈1.56s.
+
+4. **Jawari shimmer boost on S1/S4:** `jawari_buzz` raised 0.10 → 0.18 on S1, 0.01 → 0.18 on S4. `buzz_gate_s` extended on S1 (1.50 → 2.25s) and S4 (0.35 → 0.50s) so shimmer persists long enough to hear. S4 effect is subtle due to `buzz_freq_scale` hitting its 0.1 floor (mandra Sa frequency).
+
+5. **Snappier plucks on S1/S2/S3:** New `pluck_attack_scale` parameter (1.8) scales noise burst and metal harmonics before peak normalization — shifts normalised peak energy toward t=0 for a snappier onset without changing volume. `ks_level` reduced on S1 (0.70 → 0.50) and S2/S3 (0.80 → 0.32) to rebalance pluck vs. drone.
+
+### Lesson
+
+Incremental changes + frequent listening tests on selected tonics (A#2, C#3, E3, A3) is the right workflow. Drastic parameter changes (sustains of 15–25s, 10 cycles) caused chaos and had to be reverted.

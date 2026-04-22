@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: Use generate_tanpura_files_v2.py instead.
+
+This script uses a Karplus-Strong waveguide model with bridge termination. While
+it was the first implementation to produce convincing jawari, the delay-line
+feedback creates lo-fi artifacts that the additive synthesis in v2 avoids.
+Kept for reference only — do not use for asset generation.
+
+---
+
 Generate pre-recorded audio files for tanpura playback.
 Creates 45 files: 3 String 1 notes (P, m, N) × 15 Sa values (G#2 to A#3)
 
@@ -414,6 +423,14 @@ def generate_tanpura_cycle(sa_frequency, string1_note):
 
 def main():
     """Generate all tanpura audio files (OGG for Android, CAF for iOS)."""
+    print("WARNING: This script is deprecated.")
+    print("Use generate_tanpura_files_v2.py instead.")
+    print()
+    answer = input("Continue anyway? [y/N] ").strip().lower()
+    if answer != "y":
+        print("Aborted.")
+        return
+
     ogg_dir = Path(__file__).parent / "output" / "tanpura"
     caf_dir = Path(__file__).parent / "output" / "tanpura_caf"
     ogg_dir.mkdir(parents=True, exist_ok=True)
