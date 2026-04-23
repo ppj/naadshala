@@ -45,7 +45,7 @@ SUSTAIN_TAIL = 3.0
 # ---------------------------------------------------------------------------
 SA_DETUNE_CENTS  = 3.0
 MAX_HARMONICS    = 80
-FREQ_JITTER      = 0.0003
+FREQ_JITTER      = 0.0006
 JAWARI_REF_HZ    = 165.0   # Pa of A3 (highest tonic) — jawari_strength scales down below this
 
 # ---------------------------------------------------------------------------
