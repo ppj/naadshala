@@ -43,7 +43,7 @@ SUSTAIN_TAIL = 3.0
 # ---------------------------------------------------------------------------
 # Synthesis parameters  (must match tanpura_synth.py)
 # ---------------------------------------------------------------------------
-SA_DETUNE_CENTS  = 2.0
+SA_DETUNE_CENTS  = 3.0
 MAX_HARMONICS    = 80
 FREQ_JITTER      = 0.0003
 JAWARI_REF_HZ    = 165.0   # Pa of A3 (highest tonic) — jawari_strength scales down below this
@@ -106,6 +106,7 @@ STRING_PARAMS = {
         "ks_level":           0.50,
         "pluck_decay_scale":  0.2,
         "pluck_attack_scale": 1.8,
+        "swell_width_factor": 0.80,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
@@ -126,6 +127,7 @@ STRING_PARAMS = {
         "ks_level":             0.32,
         "pluck_decay_scale":    0.2,
         "pluck_attack_scale":   1.8,
+        "swell_width_factor":   0.70,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
         "jawari_strength":      0.68,
@@ -145,6 +147,7 @@ STRING_PARAMS = {
         "ks_level":             0.32,
         "pluck_decay_scale":    0.2,
         "pluck_attack_scale":   1.8,
+        "swell_width_factor":   0.70,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
@@ -163,6 +166,7 @@ STRING_PARAMS = {
         "buzz_gate_s":        0.50,
         "ks_level":           0.55,
         "pluck_decay_scale":  0.7,
+        "swell_width_factor": 0.80,
     },
 }
 
@@ -288,7 +292,7 @@ def harmonic_envelope(t, h, params):
     # 2. Swell  (jawari bloom — mid-upper harmonics swell the most)
     h_swell_factor = 1.0 + 0.7 * np.exp(-0.5 * ((h - 10) / 5) ** 2)
     swell_t   = swell_center * (1.0 + 0.04 * h)   # later for higher h
-    swell_w   = swell_t * 0.50
+    swell_w   = swell_t * params.get("swell_width_factor", 0.50)
     swell     = 1.0 + swell_amount * h_swell_factor * np.exp(
         -0.5 * ((t - swell_t) / max(swell_w, 0.01)) ** 2
     )
