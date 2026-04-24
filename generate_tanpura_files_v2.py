@@ -122,7 +122,7 @@ STRING_PARAMS = {
         "transient_db":         -23.0,
         "level":                0.65,
         "pan":                  0.48,
-        "jawari_buzz":          0.14,
+        "jawari_buzz":          0.13,
         "buzz_gate_s":          1.50,
         "ks_level":             0.32,
         "pluck_decay_scale":    0.2,
@@ -142,7 +142,7 @@ STRING_PARAMS = {
         "transient_db":         -24.0,
         "level":                0.87,
         "pan":                  0.55,
-        "jawari_buzz":          0.12,
+        "jawari_buzz":          0.11,
         "buzz_gate_s":          1.50,
         "ks_level":             0.32,
         "pluck_decay_scale":    0.2,
@@ -151,22 +151,23 @@ STRING_PARAMS = {
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
-        "jawari_strength":    0.20,
+        "jawari_strength":    0.72,
         "jawari_shift_db":    -2.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            7.0,
+        "sustain":            10.0,
+        "harmonic_decay_coeff": 0.04,
         "swell_amount":       0.85,
-        "swell_center_s":     0.30,
+        "swell_center_s":     0.55,
         "attack_ms":          2.5,
         "transient_db":       -22.0,
         "level":              0.85,
         "pan":                0.62,
-        "jawari_buzz":        0.18,
+        "jawari_buzz":        0.20,
         "buzz_gate_s":        0.50,
         "ks_level":           0.55,
         "pluck_decay_scale":  0.7,
-        "swell_width_factor": 0.80,
+        "swell_width_factor": 0.60,
     },
 }
 
@@ -680,7 +681,7 @@ def synthesize_tanpura(tonic_hz, interval, sr):
         if snum == 4:
             # Thick brass/bronze string has naturally weak high harmonics.
             # Low-pass at ~8× fundamental preserves warmth without high-harmonic shred.
-            lp_hz  = min(freq * 8.0, 600.0)
+            lp_hz  = min(freq * 10.0, 1000.0)
             b_lp, a_lp = sig.butter(2, lp_hz / (sr / 2), btype='low')
             sustain = sig.lfilter(b_lp, a_lp, sustain)
 
