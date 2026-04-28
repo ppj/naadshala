@@ -6,23 +6,35 @@ Audio generation tools for Hindustani classical music applications.
 
 ## Scripts
 
-### generate_tanpura_files.py
+### generate_tanpura_files_v2.py _(primary)_
 
-Generates realistic tanpura drone sounds using additive synthesis.
+Generates loopable tanpura drone sounds using additive jawari synthesis.
 
-- **Output:** OGG Vorbis → `output/tanpura/` (Android); CAF/AAC → `output/tanpura_caf/` (iOS)
-- **Coverage:** 15 Sa values (G#2 to A#3) x 3 String 1 options (P, m, N) = 45 files per format
-- **Harmonic structure:** Extracted from real Calcutta-standard male tanpura via spectral analysis
-- **Key feature:** Authentic jawari effect with H7 as dominant harmonic
+- **Output:** OGG Vorbis → `output/tanpura_ogg/` (Android); CAF/ALAC → `output/tanpura_caf/` (iOS)
+- **Coverage:** 15 Sa values (G#2 to A#3) × 3 String 1 options (P, m, N) = 45 files per format
+- **Harmonic structure:** Derived from real Calcutta-standard tanpura spectral template
+- **Key feature:** Per-string jawari buzz via asymmetric waveshaping + modal pluck transient
+- **Looping:** Renders 6 cycles, extracts cycle 4, applies 150ms crossfade for seamless looping
 - **Requirement:** CAF output requires macOS (`afconvert`, pre-installed); OGG output works on any platform
+- **Sample rate:** 48 kHz stereo, ~3.6 seconds per file
+
+> `generate_tanpura_files.py` is the previous Karplus-Strong waveguide implementation, kept for reference.
 
 ### generate_reference_plucks.py
 
 Generates guitar-like reference pluck sounds using Karplus-Strong algorithm.
 
 - **Output:** OGG Vorbis files (~1 second each)
-- **Coverage:** 15 Sa values x 12 swars = 180 files
+- **Coverage:** 15 Sa values × 12 swars = 180 files
 - **Use case:** Training mode reference notes for pitch matching
+
+### generate_swarmandal_plucks.py
+
+Generates swarmandal-like pluck sounds using Karplus-Strong algorithm.
+
+- **Output:** OGG Vorbis files (~3 seconds each, 500ms fade out)
+- **Coverage:** 15 Sa values × 13 swars (12 + ati-taar Sa) = 195 files
+- **Character:** Brighter and longer sustain than reference plucks
 
 ## Setup
 
@@ -39,20 +51,23 @@ pip install -r requirements.txt
 
 ```bash
 # Generate tanpura files
-python generate_tanpura_files.py
+python generate_tanpura_files_v2.py
 
 # Generate pluck files
 python generate_reference_plucks.py
+
+# Generate swarmandal files
+python generate_swarmandal_plucks.py
 ```
 
-Output files are written to `./output/tanpura/`, `./output/tanpura_caf/`, and `./output/plucks/` by default.
+Output files are written to `./output/tanpura_ogg/`, `./output/tanpura_caf/`, `./output/plucks/`, and `./output/swarmandal/` by default.
 
 ## Audio Configuration
 
-Both scripts use:
-- **Sample rate:** 44.1 kHz
+All scripts use:
 - **Format:** OGG Vorbis (compressed, good quality)
 - **Tuning:** Just Intonation ratios (not equal temperament)
+- **Sample rate:** 48 kHz (tanpura v2); 44.1 kHz (plucks, swarmandal)
 
 ### Just Intonation Ratios
 

@@ -6,11 +6,11 @@ Generates 45 loopable single-cycle OGG + CAF files:
   15 tonics (G#2–A#3) × 3 string-1 intervals (Pa / Ma / Ni)
 
 Algorithm: ports the jawari additive engine from tanpura/tanpura_synth.py.
-Renders 5 cycles, extracts cycle 4 (has residual harmonics from cycles 1–3),
+Renders 6 cycles, extracts cycle 4 (has residual harmonics from cycles 1–3),
 applies 150 ms crossfade at the loop boundary for seamless AudioTrack looping.
 
 Output:
-  output/tanpura/{name}_{interval}.ogg   (Android)
+  output/tanpura_ogg/{name}_{interval}.ogg   (Android)
   output/tanpura_caf/{name}_{interval}.caf  (iOS, macOS only)
 
 Dependencies: numpy, scipy, soundfile, ffmpeg CLI, afconvert (macOS)
@@ -37,15 +37,16 @@ OGG_QUALITY = 10
 # ---------------------------------------------------------------------------
 SHORT_GAP    = 0.6   # seconds
 LONG_GAP     = 1.2   # seconds
-NUM_CYCLES   = 5
+NUM_CYCLES   = 6
 SUSTAIN_TAIL = 3.0
 
 # ---------------------------------------------------------------------------
 # Synthesis parameters  (must match tanpura_synth.py)
 # ---------------------------------------------------------------------------
-SA_DETUNE_CENTS  = 2.0
+SA_DETUNE_CENTS  = 3.0
 MAX_HARMONICS    = 80
-FREQ_JITTER      = 0.0003
+FREQ_JITTER      = 0.0006
+JAWARI_REF_HZ    = 165.0   # Pa of A3 (highest tonic) — jawari_strength scales down below this
 
 # ---------------------------------------------------------------------------
 # Tonics: G#2 → A#3 (15 semitones)
@@ -83,7 +84,7 @@ STRING1_RATIOS = {
 # Output directories
 # ---------------------------------------------------------------------------
 OUTPUT_DIR     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
-OGG_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "tanpura")
+OGG_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "tanpura_ogg")
 CAF_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "tanpura_caf")
 
 STRING_PARAMS = {
@@ -93,66 +94,76 @@ STRING_PARAMS = {
         "jawari_shift_db":    0.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            4.0,
-        "swell_amount":       0.82,
+        "sustain":            8.5,
+        "swell_amount":       0.85,
         "swell_center_s":     0.25,
         "attack_ms":          2.0,
-        "transient_db":       -25.0,
-        "level":              0.72,
+        "level":              0.88,
         "pan":                0.35,
-        "jawari_buzz":        0.10,
-        "buzz_gate_s":        1.50,    # buzz/shimmer fade to ~5% by this time
-        "ks_level":           0.70,
+        "jawari_buzz":        0.18,
+        "buzz_gate_s":        2.25,    # buzz/shimmer fade to ~5% by this time
+        "ks_level":           0.50,
+        "pluck_decay_scale":  0.2,
+        "pluck_attack_scale": 1.8,
+        "swell_width_factor": 0.80,
     },
     2: {  # ── Sa (madhya saptak) ──────────────────────────────────────
         # Primary Sa: thinner steel → lighter bridge contact
-        "jawari_strength":    0.70,
-        "jawari_shift_db":    0.0,
-        "jawari_h3_extra_db": 0.0,
-        "jawari_peak_shift":  0,
-        "sustain":            2.5,
-        "swell_amount":       0.60,
-        "swell_center_s":     0.20,
-        "attack_ms":          1.5,
-        "transient_db":       -23.0,
-        "level":              0.90,
-        "pan":                0.48,
-        "jawari_buzz":        0.14,
-        "buzz_gate_s":        1.50,
-        "ks_level":           0.8,
+        "jawari_strength":      0.70,
+        "jawari_shift_db":      0.0,
+        "jawari_h3_extra_db":   0.0,
+        "jawari_peak_shift":    0,
+        "sustain":              5.5,
+        "harmonic_decay_coeff": 0.04,
+        "swell_amount":         0.72,
+        "swell_center_s":       0.20,
+        "attack_ms":            1.5,
+        "level":                0.65,
+        "pan":                  0.48,
+        "jawari_buzz":          0.13,
+        "buzz_gate_s":          1.50,
+        "ks_level":             0.32,
+        "pluck_decay_scale":    0.2,
+        "pluck_attack_scale":   1.8,
+        "swell_width_factor":   0.70,
     },
     3: {  # ── Sa (madhya saptak, micro-detuned) ───────────────────────
-        "jawari_strength":    0.68,
-        "jawari_shift_db":    -1.0,
-        "jawari_h3_extra_db": 0.0,
-        "jawari_peak_shift":  0,
-        "sustain":            2.0,
-        "swell_amount":       0.58,
-        "swell_center_s":     0.22,
-        "attack_ms":          1.5,
-        "transient_db":       -24.0,
-        "level":              0.87,
-        "pan":                0.55,
-        "jawari_buzz":        0.12,
-        "buzz_gate_s":        1.50,
-        "ks_level":           0.8,
+        "jawari_strength":      0.68,
+        "jawari_shift_db":      -1.0,
+        "jawari_h3_extra_db":   0.0,
+        "jawari_peak_shift":    0,
+        "sustain":              5.0,
+        "harmonic_decay_coeff": 0.04,
+        "swell_amount":         0.70,
+        "swell_center_s":       0.35,
+        "attack_ms":            1.5,
+        "level":                0.87,
+        "pan":                  0.55,
+        "jawari_buzz":          0.11,
+        "buzz_gate_s":          1.50,
+        "ks_level":             0.32,
+        "pluck_decay_scale":    0.2,
+        "pluck_attack_scale":   1.8,
+        "swell_width_factor":   0.70,
     },
     4: {  # ── Sa (mandra saptak — brass/bronze) ───────────────────────
         # Thickest string, deepest contact with bridge → strongest jawari
-        "jawari_strength":    0.20,
+        "jawari_strength":    0.72,
         "jawari_shift_db":    -2.0,
         "jawari_h3_extra_db": 0.0,
         "jawari_peak_shift":  0,
-        "sustain":            4.0,
-        "swell_amount":       0.78,
-        "swell_center_s":     0.30,
+        "sustain":            10.0,
+        "harmonic_decay_coeff": 0.04,
+        "swell_amount":       0.85,
+        "swell_center_s":     0.55,
         "attack_ms":          2.5,
-        "transient_db":       -22.0,
-        "level":              0.70,
+        "level":              0.85,
         "pan":                0.62,
-        "jawari_buzz":        0.01,
-        "buzz_gate_s":        0.35,
+        "jawari_buzz":        0.20,
+        "buzz_gate_s":        0.50,
         "ks_level":           0.55,
+        "pluck_decay_scale":  0.7,
+        "swell_width_factor": 0.60,
     },
 }
 
@@ -278,13 +289,14 @@ def harmonic_envelope(t, h, params):
     # 2. Swell  (jawari bloom — mid-upper harmonics swell the most)
     h_swell_factor = 1.0 + 0.7 * np.exp(-0.5 * ((h - 10) / 5) ** 2)
     swell_t   = swell_center * (1.0 + 0.04 * h)   # later for higher h
-    swell_w   = swell_t * 0.50
+    swell_w   = swell_t * params.get("swell_width_factor", 0.50)
     swell     = 1.0 + swell_amount * h_swell_factor * np.exp(
         -0.5 * ((t - swell_t) / max(swell_w, 0.01)) ** 2
     )
 
-    # 3. Decay  (extremely slow — higher harmonics decay a bit faster)
-    decay_rate = (1.0 / sustain_s) * (1.0 + 0.015 * h)
+    # 3. Decay  (upper harmonics fade significantly faster than fundamental)
+    hdc = params.get("harmonic_decay_coeff", 0.06)
+    decay_rate = (1.0 / sustain_s) * (1.0 + hdc * h)
     decay = np.exp(-decay_rate * t)
 
     return attack * swell * decay
@@ -390,8 +402,10 @@ def _synthesize_pluck_modal(frequency, sr, params):
     b_n, a_n = sig.butter(3, [lo, hi], btype='band')
     noise    = rng.standard_normal(n_samples)
     noise    = sig.lfilter(b_n, a_n, noise)
-    noise_env = (1.0 - np.exp(-t / 0.003)) * np.exp(-t / 0.025)
-    signal   += 0.4 * noise_env * noise
+    decay_scale  = params.get("pluck_decay_scale", 1.0)
+    attack_scale = params.get("pluck_attack_scale", 1.0)
+    noise_env = (1.0 - np.exp(-t / 0.003)) * np.exp(-t / (0.025 * decay_scale))
+    signal   += 0.4 * attack_scale * noise_env * noise
 
     # 2. Body resonance modes — soft attack, exponential decay.
     # (freq, attack_tau_s, decay_tau_s, relative_amplitude)
@@ -405,7 +419,7 @@ def _synthesize_pluck_modal(frequency, sr, params):
         if f_mode >= sr * 0.45:
             continue
         mode_phase = rng.uniform(0, 2 * np.pi)
-        env = (1.0 - np.exp(-t / atk_tau)) * np.exp(-t / dec_tau)
+        env = (1.0 - np.exp(-t / atk_tau)) * np.exp(-t / (dec_tau * decay_scale))
         signal += amp * env * np.sin(2 * np.pi * f_mode * t + mode_phase)
 
     # 3. Metallic string harmonics — bright upper partials present only
@@ -424,11 +438,13 @@ def _synthesize_pluck_modal(frequency, sr, params):
             break
         phase = rng.uniform(0, 2 * np.pi)
         env   = np.exp(-t / dec_tau)
-        signal += amp * env * np.sin(2 * np.pi * f_h * t + phase)
+        signal += amp * attack_scale * env * np.sin(2 * np.pi * f_h * t + phase)
 
     # High-pass blend to reduce bass thump on the pluck.
-    # Cutoff at 500 Hz, 25/75 blend gives ~-12 dB below the shelf.
-    shelf_freq = min(500.0 / (sr / 2), 0.99)
+    # Cutoff at 3× fundamental so all strings lose a similar fraction of
+    # pluck energy regardless of pitch (fixed 500 Hz stripped low strings).
+    shelf_hz   = min(frequency * 3.0, 500.0)
+    shelf_freq = min(shelf_hz / (sr / 2), 0.99)
     b_shelf, a_shelf = sig.butter(2, shelf_freq, btype='high')
     signal_hi = sig.lfilter(b_shelf, a_shelf, signal)
     signal = signal * 0.25 + signal_hi * 0.75
@@ -647,11 +663,24 @@ def synthesize_tanpura(tonic_hz, interval, sr):
 
     rendered = {}
     for snum in (1, 2, 3, 4):
-        sp       = STRING_PARAMS[snum]
+        sp       = dict(STRING_PARAMS[snum])   # copy — we may mutate jawari_strength
         ring_dur = sp["sustain"] + 3.0
         freq     = freqs[snum]
 
+        if snum in (1, 4):
+            # Lower pitches get softer jawari peaks — less bridge contact at lower tension.
+            jaw_scale = np.clip((freq / JAWARI_REF_HZ) ** 0.5, 0.4, 1.0)
+            sp["jawari_strength"] = sp["jawari_strength"] * jaw_scale
+
         sustain  = synthesize_string(freq, ring_dur, sr, sp)
+
+        if snum == 4:
+            # Thick brass/bronze string has naturally weak high harmonics.
+            # Low-pass at ~8× fundamental preserves warmth without high-harmonic shred.
+            lp_hz  = min(freq * 10.0, 1000.0)
+            b_lp, a_lp = sig.butter(2, lp_hz / (sr / 2), btype='low')
+            sustain = sig.lfilter(b_lp, a_lp, sustain)
+
         # Scale jawari buzz with string frequency: lower strings get less buzz
         # to prevent harshness. Full buzz at/above ~E3 (165 Hz), cubic rolloff below.
         # G#2→25%, A#2→36%, C#3→60%, E3→100%
@@ -710,7 +739,7 @@ def extract_loopable_cycle(stereo, cycle_dur, sr, cycle_idx=3, xfade_s=0.15):
         stereo:     Full render, shape (N, 2), float64.
         cycle_dur:  Duration of one cycle in seconds (3.6 s for standard tanpura).
         sr:         Sample rate.
-        cycle_idx:  0-based index of the cycle to extract (default 3 = cycle 4 of 5).
+        cycle_idx:  0-based index of the cycle to extract (default 3 = cycle 4 of 6).
         xfade_s:    Crossfade length in seconds (default 0.15 = 150 ms).
 
     Returns:
